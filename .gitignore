@@ -1,0 +1,21 @@
+# Node modules
+node_modules/
+backend/node_modules/
+mobile/node_modules/
+
+# Environment variables
+backend/.env
+
+# macOS
+.DS_Store
+
+# React Native iOS
+mobile/ios/Pods/
+mobile/ios/build/
+
+# React Native Android
+mobile/android/.gradle/
+mobile/android/build/
+
+# Logs
+npm-debug.log*

@@ -5,6 +5,7 @@ mobile/node_modules/
 
 # Environment variables
 backend/.env
+mobile/.env
 
 # macOS
 .DS_Store
@@ -19,3 +20,8 @@ mobile/android/build/
 
 # Logs
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Expo
+.expo/

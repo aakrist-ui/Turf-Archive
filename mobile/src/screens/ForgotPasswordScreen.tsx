@@ -13,21 +13,19 @@ import {
 } from 'react-native';
 import api from '../services/api';
 
-interface LoginScreenProps {
+interface ForgotPasswordScreenProps {
   navigation: any;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
+const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
 
-  const handleLogin = async () => {
-    // Basic validation
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+  const handleForgotPassword = async () => {
+    // Validation
+    if (!email) {
+      Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
@@ -37,20 +35,25 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     }
 
     setLoading(true);
-    
+
     try {
-      const response = await api.post('/auth/login', {
+      const response = await api.post('/auth/forgot-password', {
         email,
-        password,
       });
 
-      Alert.alert('Success', 'Login successful');
-      console.log(response.data);
-      
-      // TODO: Navigate to home screen and store token
-      
+      Alert.alert(
+        'Success',
+        'Password reset instructions have been sent to your email.',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Login')
+          }
+        ]
+      );
+
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Login failed');
+      Alert.alert('Error', error.response?.data?.message || 'Failed to send reset email');
     } finally {
       setLoading(false);
     }
@@ -79,8 +82,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
           {/* Welcome Section */}
           <View style={styles.welcomeSection}>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Sign in to continue</Text>
+            <Text style={styles.title}>Forgot Password?</Text>
+            <Text style={styles.subtitle}>
+              Enter your email and we'll send you instructions to reset your password
+            </Text>
           </View>
 
           {/* Input Section */}
@@ -104,61 +109,30 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
                 editable={!loading}
               />
             </View>
-
-            {/* Password Input */}
-            <View style={styles.inputWrapper}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  passwordFocused && styles.inputFocused
-                ]}
-                value={password}
-                onChangeText={setPassword}
-                onFocus={() => setPasswordFocused(true)}
-                onBlur={() => setPasswordFocused(false)}
-                secureTextEntry
-                placeholder="Enter your password"
-                placeholderTextColor="#718096"
-                editable={!loading}
-              />
-            </View>
-
-            {/* Forgot Password */}
-            <TouchableOpacity 
-              style={styles.forgotContainer}
-              disabled={loading}
-              onPress={() => navigation.navigate('ForgotPassword')}
-            >
-              <Text style={styles.forgot}>Forgot Password?</Text>
-            </TouchableOpacity>
           </View>
 
-          {/* Sign In Button */}
+          {/* Submit Button */}
           <TouchableOpacity 
             style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handleLogin}
+            onPress={handleForgotPassword}
             disabled={loading}
             activeOpacity={0.8}
           >
             {loading ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
+              <Text style={styles.buttonText}>Send Reset Link</Text>
             )}
           </TouchableOpacity>
 
-          {/* Sign Up Link */}
+          {/* Back to Login Link */}
           <View style={styles.bottomContainer}>
-            <Text style={styles.bottomText}>
-              Don't have an account?{' '}
-              <TouchableOpacity 
-                disabled={loading}
-                onPress={() => navigation.navigate('Register')}
-              >
-                <Text style={styles.link}>Sign up</Text>
-              </TouchableOpacity>
-            </Text>
+            <TouchableOpacity 
+              disabled={loading}
+              onPress={() => navigation.navigate('Login')}
+            >
+              <Text style={styles.link}>← Back to Login</Text>
+            </TouchableOpacity>
           </View>
 
         </View>
@@ -167,7 +141,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   );
 };
 
-export default LoginScreen;
+export default ForgotPasswordScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -228,6 +202,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#a0aec0',
     fontWeight: '400',
+    lineHeight: 24,
   },
 
   // Input Section
@@ -257,17 +232,6 @@ const styles = StyleSheet.create({
   inputFocused: {
     backgroundColor: '#2d3548',
     borderColor: '#4c9aff',
-  },
-
-  // Forgot Password
-  forgotContainer: {
-    alignSelf: 'flex-end',
-    marginTop: 4,
-  },
-  forgot: {
-    fontSize: 14,
-    color: '#4c9aff',
-    fontWeight: '600',
   },
 
   // Button
@@ -301,15 +265,9 @@ const styles = StyleSheet.create({
     marginTop: 32,
     alignItems: 'center',
   },
-  bottomText: {
-    fontSize: 15,
-    color: '#a0aec0',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   link: {
     color: '#4c9aff',
     fontWeight: '700',
-    marginLeft: 4,
+    fontSize: 15,
   },
 });

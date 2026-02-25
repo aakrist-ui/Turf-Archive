@@ -205,13 +205,13 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
             <View style={styles.bottomContainer}>
               <Text style={styles.bottomText}>
                 Already have an account?{' '}
-                <TouchableOpacity 
-                  disabled={loading}
-                  onPress={() => navigation.navigate('Login')}
-                >
-                  <Text style={styles.link}>Sign in</Text>
-                </TouchableOpacity>
               </Text>
+              <TouchableOpacity 
+                disabled={loading}
+                onPress={() => navigation.navigate('Login')}
+              >
+                <Text style={styles.link}>Sign in</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -352,13 +352,13 @@ const styles = StyleSheet.create({
   // Bottom Section
   bottomContainer: {
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
     paddingBottom: 10,
   },
   bottomText: {
     fontSize: 15,
     color: '#a0aec0',
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   link: {
     color: '#4c9aff',

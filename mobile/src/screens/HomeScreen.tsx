@@ -1,180 +1,164 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
   ActivityIndicator,
-  StatusBar,
-  SafeAreaView,
   RefreshControl,
+  TextInput,
 } from 'react-native';
-import ArenaCard, { Arena } from '../components/ArenaCard';
-import { arenaService } from '../services/arenaService';
+import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
-const FILTERS = ['All', 'Nearby', 'Top Rated', 'Budget'];
+interface Arena {
+  _id: string;
+  name: string;
+  location: {
+    address: string;
+    city: string;
+  };
+  price: number;
+  priceUnit: string;
+  images: string[];
+  rating: number;
+  surfaceType: string;
+  facilities: string[];
+}
 
 const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { user } = useAuth();
   const [arenas, setArenas] = useState<Arena[]>([]);
-  const [filtered, setFiltered] = useState<Arena[]>([]);
-  const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState('All');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchArenas = useCallback(async () => {
-    try {
-      setError(null);
-      const data = await arenaService.getAllArenas();
-      setArenas(data);
-      setFiltered(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load arenas. Please try again.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  useEffect(() => {
+    fetchArenas();
   }, []);
 
-  useEffect(() => {
-    fetchArenas();
-  }, [fetchArenas]);
-
-  // Search + filter logic
-  useEffect(() => {
-    let result = [...arenas];
-
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        a =>
-          a.name.toLowerCase().includes(q) ||
-          a.location.toLowerCase().includes(q),
-      );
+  const fetchArenas = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/arenas');
+      console.log('Arenas fetched:', response.data);
+      setArenas(response.data.data || []);
+    } catch (error: any) {
+      console.log('Error fetching arenas:', error.response?.data || error.message);
+    } finally {
+      setLoading(false);
     }
-
-    if (activeFilter === 'Top Rated') {
-      result = result.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-    } else if (activeFilter === 'Budget') {
-      result = result.sort((a, b) => a.price - b.price);
-    }
-
-    setFiltered(result);
-  }, [search, activeFilter, arenas]);
-
-  const handleArenaPress = (arena: Arena) => {
-    navigation.navigate('ArenaDetails', { arenaId: arena._id, arena });
   };
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchArenas();
+    await fetchArenas();
+    setRefreshing(false);
   };
 
-  const renderHeader = () => (
-    <View>
-      {/* Top Header */}
-      <View style={styles.topHeader}>
-        <View>
-          <Text style={styles.greeting}>Find Your Game ⚡</Text>
-          <Text style={styles.subtitle}>Book a futsal arena near you</Text>
+  const filteredArenas = arenas.filter(arena =>
+    arena.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    arena.location.city.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const renderArenaCard = (arena: Arena) => (
+    <TouchableOpacity
+      key={arena._id}
+      style={styles.arenaCard}
+      activeOpacity={0.7}
+      onPress={() => navigation.navigate('ArenaDetail', { arenaId: arena._id })} 
+    >
+      {/* Arena Image */}
+      <View style={styles.imageContainer}>
+        {arena.images && arena.images.length > 0 ? (
+          <Image
+            source={{ uri: arena.images[0] }}
+            style={styles.arenaImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.placeholderImage}>
+            <Text style={styles.placeholderEmoji}>🏟️</Text>
+          </View>
+        )}
+        {/* Rating Badge */}
+        {arena.rating > 0 && (
+          <View style={styles.ratingBadge}>
+            <Text style={styles.ratingText}>⭐ {arena.rating.toFixed(1)}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Arena Info */}
+      <View style={styles.arenaInfo}>
+        <Text style={styles.arenaName} numberOfLines={1}>
+          {arena.name}
+        </Text>
+        
+        <View style={styles.locationRow}>
+          <Text style={styles.locationIcon}>📍</Text>
+          <Text style={styles.locationText} numberOfLines={1}>
+            {arena.location.city}
+          </Text>
         </View>
-        <TouchableOpacity
-          style={styles.notifBtn}
-          onPress={() => navigation.navigate('Notifications')}
-        >
-          <Text style={styles.notifIcon}>🔔</Text>
-        </TouchableOpacity>
+
+        <View style={styles.detailsRow}>
+          <View style={styles.surfaceTag}>
+            <Text style={styles.surfaceText}>{arena.surfaceType}</Text>
+          </View>
+          
+          <View style={styles.priceContainer}>
+            <Text style={styles.priceAmount}>NPR {arena.price}</Text>
+            <Text style={styles.priceUnit}>/{arena.priceUnit}</Text>
+          </View>
+        </View>
+
+        {/* Facilities */}
+        {arena.facilities && arena.facilities.length > 0 && (
+          <View style={styles.facilitiesRow}>
+            {arena.facilities.slice(0, 3).map((facility, index) => (
+              <View key={index} style={styles.facilityTag}>
+                <Text style={styles.facilityText}>{facility}</Text>
+              </View>
+            ))}
+            {arena.facilities.length > 3 && (
+              <Text style={styles.moreFacilities}>
+                +{arena.facilities.length - 3} more
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Home</Text>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search arenas or locations..."
-          placeholderTextColor="#666688"
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Text style={styles.clearIcon}>✕</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search arenas or city..."
+            placeholderTextColor="#666688"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
       </View>
 
-      {/* Filter Chips */}
-      <View style={styles.filterRow}>
-        {FILTERS.map(f => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.chip, activeFilter === f && styles.chipActive]}
-            onPress={() => setActiveFilter(f)}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                activeFilter === f && styles.chipTextActive,
-              ]}
-            >
-              {f}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Section Label */}
-      <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>
-          {activeFilter === 'All' ? 'All Arenas' : activeFilter}
-        </Text>
-        <Text style={styles.sectionCount}>{filtered.length} found</Text>
-      </View>
-    </View>
-  );
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color="#00E5FF" />
-        <Text style={styles.loadingText}>Loading arenas...</Text>
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorIcon}>⚠️</Text>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchArenas}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D1A" />
-      <FlatList
-        data={filtered}
-        keyExtractor={item => item._id}
-        renderItem={({ item }) => (
-          <ArenaCard arena={item} onPress={handleArenaPress} />
-        )}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🏟️</Text>
-            <Text style={styles.emptyText}>No arenas found</Text>
-            <Text style={styles.emptySubText}>Try adjusting your search or filters</Text>
-          </View>
-        }
+      {/* Content */}
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -182,10 +166,45 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             tintColor="#00E5FF"
           />
         }
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
-    </SafeAreaView>
+      >
+        {/* Section Title */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Available Arenas</Text>
+          <Text style={styles.arenaCount}>
+            {filteredArenas.length} arena{filteredArenas.length !== 1 ? 's' : ''}
+          </Text>
+        </View>
+
+        {/* Loading State */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#00E5FF" />
+            <Text style={styles.loadingText}>Loading arenas...</Text>
+          </View>
+        ) : filteredArenas.length === 0 ? (
+          // Empty State
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyEmoji}>🏟️</Text>
+            <Text style={styles.emptyTitle}>
+              {searchQuery ? 'No arenas found' : 'No arenas available'}
+            </Text>
+            <Text style={styles.emptyText}>
+              {searchQuery
+                ? 'Try a different search term'
+                : 'Check back later for new arenas'}
+            </Text>
+          </View>
+        ) : (
+          // Arena List
+          <View style={styles.arenaList}>
+            {filteredArenas.map(renderArenaCard)}
+          </View>
+        )}
+
+        {/* Bottom Spacing for Tab Bar */}
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
+    </View>
   );
 };
 
@@ -194,171 +213,216 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0D0D1A',
   },
-  centered: {
-    flex: 1,
-    backgroundColor: '#0D0D1A',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
+  header: {
+    paddingTop: 60,
+    paddingBottom: 20,
+    paddingHorizontal: 24,
+    backgroundColor: '#1C1C2E',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2A2A45',
   },
-  listContent: {
-    paddingBottom: 100,
-  },
-
-  // Header
-  topHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  greeting: {
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
     color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: -0.5,
   },
-  subtitle: {
-    color: '#9E9EB8',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  notifBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1C1C2E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2A2A45',
-  },
-  notifIcon: {
-    fontSize: 18,
-  },
-
-  // Search
   searchContainer: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: '#1C1C2E',
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1C1C2E',
-    marginHorizontal: 16,
-    marginBottom: 14,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#2A2A45',
+    backgroundColor: '#2A2A45',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 50,
   },
   searchIcon: {
-    fontSize: 16,
-    marginRight: 8,
+    fontSize: 20,
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
+    fontSize: 16,
     color: '#FFFFFF',
-    fontSize: 15,
-    padding: 0,
   },
-  clearIcon: {
-    color: '#666688',
-    fontSize: 14,
-    paddingHorizontal: 4,
+  content: {
+    flex: 1,
   },
-
-  // Filters
-  filterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 18,
-  },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#1C1C2E',
-    borderWidth: 1,
-    borderColor: '#2A2A45',
-  },
-  chipActive: {
-    backgroundColor: '#00E5FF',
-    borderColor: '#00E5FF',
-  },
-  chipText: {
-    color: '#9E9EB8',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  chipTextActive: {
-    color: '#0D0D1A',
-  },
-
-  // Section
-  sectionRow: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
   sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 17,
+    fontSize: 20,
     fontWeight: '700',
+    color: '#FFFFFF',
   },
-  sectionCount: {
-    color: '#00E5FF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-
-  // Loading / Error
-  loadingText: {
-    color: '#9E9EB8',
+  arenaCount: {
     fontSize: 14,
-    marginTop: 8,
+    color: '#666688',
   },
-  errorIcon: {
-    fontSize: 36,
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
   },
-  errorText: {
-    color: '#FF6B6B',
-    fontSize: 15,
-    textAlign: 'center',
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666688',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
     paddingHorizontal: 32,
   },
-  retryBtn: {
-    marginTop: 8,
-    backgroundColor: '#00E5FF',
-    paddingHorizontal: 28,
-    paddingVertical: 10,
-    borderRadius: 20,
+  emptyEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
   },
-  retryText: {
-    color: '#0D0D1A',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-
-  emptyContainer: {
-    alignItems: 'center',
-    paddingTop: 60,
-    gap: 8,
-  },
-  emptyIcon: {
-    fontSize: 48,
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
   emptyText: {
+    fontSize: 14,
+    color: '#666688',
+    textAlign: 'center',
+  },
+  arenaList: {
+    paddingHorizontal: 24,
+  },
+  arenaCard: {
+    backgroundColor: '#1C1C2E',
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#2A2A45',
+  },
+  imageContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 180,
+    backgroundColor: '#2A2A45',
+  },
+  arenaImage: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholderImage: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2A2A45',
+  },
+  placeholderEmoji: {
+    fontSize: 48,
+  },
+  ratingBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  ratingText: {
+    fontSize: 12,
+    fontWeight: '700',
     color: '#FFFFFF',
+  },
+  arenaInfo: {
+    padding: 16,
+  },
+  arenaName: {
     fontSize: 18,
     fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
-  emptySubText: {
-    color: '#9E9EB8',
-    fontSize: 13,
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  locationIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#666688',
+    flex: 1,
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  surfaceTag: {
+    backgroundColor: '#2A2A45',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  surfaceText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#00E5FF',
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  priceAmount: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#00E5FF',
+  },
+  priceUnit: {
+    fontSize: 12,
+    color: '#666688',
+    marginLeft: 4,
+  },
+  facilitiesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  facilityTag: {
+    backgroundColor: '#2A2A45',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 8,
+    marginTop: 4,
+  },
+  facilityText: {
+    fontSize: 11,
+    color: '#FFFFFF',
+  },
+  moreFacilities: {
+    fontSize: 11,
+    color: '#666688',
+    marginTop: 4,
+  },
+  bottomSpacer: {
+    height: 100,
   },
 });
 

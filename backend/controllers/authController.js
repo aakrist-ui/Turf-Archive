@@ -82,7 +82,6 @@ exports.login = async (req, res) => {
   }
 };
 
-// FORGOT PASSWORD (Simplified version - sends email in production)
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -93,7 +92,6 @@ exports.forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      // For security, we still return success even if user doesn't exist
       return res.json({ message: 'If that email exists, a reset link has been sent' });
     }
 
@@ -104,15 +102,10 @@ exports.forgotPassword = async (req, res) => {
       { expiresIn: '1h' }
     );
 
-    // In production, you would:
-    // 1. Save resetToken to user model with expiry
-    // 2. Send email with reset link containing token
-    // For now, we'll just log it (for development)
     console.log('Reset token for', email, ':', resetToken);
 
     res.json({ 
       message: 'If that email exists, a reset link has been sent',
-      // Remove this in production
       resetToken: resetToken 
     });
 

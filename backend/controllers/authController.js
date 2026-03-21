@@ -1,19 +1,24 @@
 const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { sendResetPasswordEmail } = require('../utils/email');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-me';
 
 // REGISTER
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
+    const normalizedName = typeof name === 'string' ? name.trim() : '';
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
     // Validation
-    if (!name || !email || !password) {
+    if (!normalizedName || !normalizedEmail || !password) {
       return res.status(400).json({ message: 'Please provide all fields' });
     }
 
     // Check if user exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
@@ -22,8 +27,8 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
-      name,
-      email,
+      name: normalizedName,
+      email: normalizedEmail,
       password: hashedPassword
     });
 
@@ -45,13 +50,14 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
     // Validation
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ message: 'Please provide email and password' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -63,7 +69,7 @@ exports.login = async (req, res) => {
 
     const token = jwt.sign(
       { id: user._id },
-      process.env.JWT_SECRET,
+      JWT_SECRET,
       { expiresIn: '30d' }
     );
 
@@ -85,12 +91,13 @@ exports.login = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-    if (!email) {
+    if (!normalizedEmail) {
       return res.status(400).json({ message: 'Please provide email' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.json({ message: 'If that email exists, a reset link has been sent' });
     }
@@ -98,15 +105,19 @@ exports.forgotPassword = async (req, res) => {
     // Generate reset token
     const resetToken = jwt.sign(
       { id: user._id },
-      process.env.JWT_SECRET,
+      JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    console.log('Reset token for', email, ':', resetToken);
+    const emailResult = await sendResetPasswordEmail({
+      to: normalizedEmail,
+      resetToken,
+    });
 
-    res.json({ 
+    res.json({
       message: 'If that email exists, a reset link has been sent',
-      resetToken: resetToken 
+      resetToken: emailResult.sent ? undefined : resetToken,
+      emailConfigured: emailResult.sent,
     });
 
   } catch (error) {
@@ -124,7 +135,7 @@ exports.resetPassword = async (req, res) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
 
     const user = await User.findById(decoded.id);
     if (!user) {

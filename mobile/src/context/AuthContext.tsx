@@ -13,6 +13,7 @@ interface AuthContextType {
   user: User | null;
   login: (token: string, userData: User) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (userData: User) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -21,6 +22,7 @@ export const AuthContext = createContext<AuthContextType>({
   user: null,
   login: async () => {},
   logout: async () => {},
+  updateUser: async () => {},
   isLoading: true,
 });
 
@@ -82,6 +84,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUser = async (userData: User) => {
+    try {
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      setUser(userData);
+    } catch (error) {
+      console.log('Error updating user data:', error);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -89,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         login,
         logout,
+        updateUser,
         isLoading,
       }}
     >

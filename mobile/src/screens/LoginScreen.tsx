@@ -27,13 +27,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [passwordFocused, setPasswordFocused] = useState(false);
 
   const handleLogin = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Basic validation
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    if (!email.includes('@')) {
+    if (!normalizedEmail.includes('@')) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
@@ -42,7 +44,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     
     try {
       const response = await api.post('/auth/login', {
-        email,
+        email: normalizedEmail,
         password,
       });
 

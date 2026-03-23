@@ -29,13 +29,16 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
 
   const handleRegister = async () => {
+    const normalizedName = name.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Validation
-    if (!name || !email || !password || !confirmPassword) {
+    if (!normalizedName || !normalizedEmail || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    if (!email.includes('@')) {
+    if (!normalizedEmail.includes('@')) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
@@ -53,9 +56,9 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/register', {
-        name,
-        email,
+      await api.post('/auth/register', {
+        name: normalizedName,
+        email: normalizedEmail,
         password,
       });
 

@@ -19,11 +19,12 @@ interface ForgotPasswordScreenProps {
 
 const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [emailFocused, setEmailFocused] = useState(false);
+  const [step, setStep] = useState<'request' | 'reset'>('request');
 
   const handleForgotPassword = async () => {
-    // Validation
     if (!email) {
       Alert.alert('Error', 'Please enter your email address');
       return;
@@ -38,22 +39,55 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation 
 
     try {
       const response = await api.post('/auth/forgot-password', {
-        email,
+        email: email.trim().toLowerCase(),
       });
 
-      Alert.alert(
-        'Success',
-        'Password reset instructions have been sent to your email.',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('Login')
-          }
-        ]
-      );
+      if (response.data?.resetToken) {
+        setResetToken(response.data.resetToken);
+        setStep('reset');
+        Alert.alert(
+          'Email service not configured',
+          'The backend created a reset code but could not send email. The reset code has been filled in for you so you can continue in development.',
+        );
+        return;
+      }
 
+      setStep('reset');
+      Alert.alert('Success', 'Password reset instructions have been sent to your email.');
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to send reset email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetToken.trim() || !newPassword.trim()) {
+      Alert.alert('Error', 'Please enter the reset code and your new password');
+      return;
+    }
+
+    if (newPassword.trim().length < 6) {
+      Alert.alert('Error', 'New password must be at least 6 characters long');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await api.post('/auth/reset-password', {
+        token: resetToken.trim(),
+        newPassword: newPassword.trim(),
+      });
+
+      Alert.alert('Success', 'Your password has been reset successfully.', [
+        {
+          text: 'Go to Login',
+          onPress: () => navigation.navigate('Login'),
+        },
+      ]);
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to reset password');
     } finally {
       setLoading(false);
     }
@@ -70,8 +104,6 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation 
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.inner}>
-
-          {/* Brand Section */}
           <View style={styles.brandContainer}>
             <View style={styles.brandTextWrapper}>
               <Text style={styles.logoItalic}>Turf</Text>
@@ -80,61 +112,96 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation 
             <Text style={styles.tagline}>Book your game, anytime</Text>
           </View>
 
-          {/* Welcome Section */}
           <View style={styles.welcomeSection}>
-            <Text style={styles.title}>Forgot Password?</Text>
+            <Text style={styles.title}>{step === 'request' ? 'Forgot Password?' : 'Reset Password'}</Text>
             <Text style={styles.subtitle}>
-              Enter your email and we'll send you instructions to reset your password
+              {step === 'request'
+                ? 'Enter your email and we will send you a reset link or code.'
+                : 'Enter the reset code and choose your new password.'}
             </Text>
           </View>
 
-          {/* Input Section */}
           <View style={styles.inputSection}>
-            {/* Email Input */}
             <View style={styles.inputWrapper}>
               <Text style={styles.label}>Email Address</Text>
               <TextInput
-                style={[
-                  styles.input,
-                  emailFocused && styles.inputFocused
-                ]}
+                style={styles.input}
                 value={email}
                 onChangeText={setEmail}
-                onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 placeholder="Enter your email"
                 placeholderTextColor="#718096"
-                editable={!loading}
+                editable={!loading && step === 'request'}
               />
             </View>
+
+            {step === 'reset' ? (
+              <>
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.label}>Reset Code</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={resetToken}
+                    onChangeText={setResetToken}
+                    autoCapitalize="none"
+                    placeholder="Paste reset code"
+                    placeholderTextColor="#718096"
+                    editable={!loading}
+                  />
+                </View>
+
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.label}>New Password</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry
+                    placeholder="Enter new password"
+                    placeholderTextColor="#718096"
+                    editable={!loading}
+                  />
+                </View>
+              </>
+            ) : null}
           </View>
 
-          {/* Submit Button */}
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handleForgotPassword}
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={step === 'request' ? handleForgotPassword : handleResetPassword}
             disabled={loading}
             activeOpacity={0.8}
           >
             {loading ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={styles.buttonText}>Send Reset Link</Text>
+              <Text style={styles.buttonText}>{step === 'request' ? 'Send Reset Link' : 'Reset Password'}</Text>
             )}
           </TouchableOpacity>
 
-          {/* Back to Login Link */}
+          {step === 'reset' ? (
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              disabled={loading}
+              onPress={() => {
+                setStep('request');
+                setResetToken('');
+                setNewPassword('');
+              }}
+            >
+              <Text style={styles.secondaryButtonText}>Request Another Code</Text>
+            </TouchableOpacity>
+          ) : null}
+
           <View style={styles.bottomContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               disabled={loading}
               onPress={() => navigation.navigate('Login')}
             >
               <Text style={styles.link}>← Back to Login</Text>
             </TouchableOpacity>
           </View>
-
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -157,8 +224,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 40,
   },
-  
-  // Brand Section
   brandContainer: {
     marginBottom: 48,
     alignItems: 'center',
@@ -186,8 +251,6 @@ const styles = StyleSheet.create({
     color: '#a0aec0',
     marginTop: 4,
   },
-
-  // Welcome Section
   welcomeSection: {
     marginBottom: 36,
   },
@@ -204,8 +267,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 24,
   },
-
-  // Input Section
   inputSection: {
     marginBottom: 32,
   },
@@ -229,12 +290,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#252b3b',
   },
-  inputFocused: {
-    backgroundColor: '#2d3548',
-    borderColor: '#4c9aff',
-  },
-
-  // Button
   button: {
     height: 56,
     backgroundColor: '#4c9aff',
@@ -259,8 +314,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-
-  // Bottom Section
+  secondaryButton: {
+    marginTop: 12,
+    height: 52,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4c9aff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: '#4c9aff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
   bottomContainer: {
     marginTop: 32,
     alignItems: 'center',
@@ -271,4 +338,3 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 });
-

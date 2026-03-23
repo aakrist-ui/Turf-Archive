@@ -39,6 +39,10 @@ const arenaSchema = new mongoose.Schema({
       type: String,
       required: true
     },
+    neighborhood: {
+      type: String,
+      trim: true
+    },
     coordinates: {
       latitude: Number,
       longitude: Number
@@ -63,6 +67,9 @@ const arenaSchema = new mongoose.Schema({
   facilities: [{
     type: String // e.g., "Parking", "Changing Room", "Lights"
   }],
+  featuredTags: [{
+    type: String
+  }],
   surfaceType: {
     type: String,
     enum: ['Natural Grass', 'Artificial Turf', 'Indoor', 'Outdoor'],
@@ -82,6 +89,40 @@ const arenaSchema = new mongoose.Schema({
   totalRatings: {
     type: Number,
     default: 0
+  },
+  contactPhone: {
+    type: String,
+    trim: true
+  },
+  website: {
+    type: String,
+    trim: true
+  },
+  bookingNotice: {
+    type: String,
+    trim: true
+  },
+  verifiedSource: {
+    type: String,
+    trim: true
+  },
+  sourceDetails: {
+    contactSource: {
+      type: String,
+      trim: true
+    },
+    ratingSource: {
+      type: String,
+      trim: true
+    },
+    priceSource: {
+      type: String,
+      trim: true
+    },
+    photoSource: {
+      type: String,
+      trim: true
+    }
   },
   isActive: {
     type: Boolean,

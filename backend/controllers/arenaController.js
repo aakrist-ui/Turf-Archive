@@ -31,7 +31,7 @@ exports.getAllArenas = async (req, res) => {
 
     const arenas = await Arena.find(query)
       .select('-timeSlots') // Exclude time slots for list view
-      .sort('-rating');
+      .sort({ rating: -1, totalRatings: -1, price: 1 });
 
     res.json({
       success: true,

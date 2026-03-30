@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Image,
   ActivityIndicator,
   Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import NotificationBell from '../components/NotificationBell';
 import api from '../services/api';
 
 interface ArenaDetailsScreenProps {
@@ -22,8 +23,9 @@ interface Arena {
   location: {
     address: string;
     city: string;
+    neighborhood?: string;
   };
-  description: string;
+  description?: string;
   price: number;
   priceUnit: string;
   images: string[];
@@ -32,6 +34,7 @@ interface Arena {
   surfaceType: string;
   capacity: number;
   facilities: string[];
+  contactPhone?: string;
   openingTime: string;
   closingTime: string;
 }
@@ -40,13 +43,12 @@ const ArenaDetailsScreen: React.FC<ArenaDetailsScreenProps> = ({ route, navigati
   const { arenaId } = route.params;
   const [arena, setArena] = useState<Arena | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date());
 
   useEffect(() => {
     fetchArenaDetails();
-  }, []);
+  }, [fetchArenaDetails]);
 
-  const fetchArenaDetails = async () => {
+  const fetchArenaDetails = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/arenas/${arenaId}`);
@@ -58,20 +60,12 @@ const ArenaDetailsScreen: React.FC<ArenaDetailsScreenProps> = ({ route, navigati
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleBookNow = () => {
-    Alert.alert(
-      'Book Arena',
-      'Booking feature coming soon!',
-      [{ text: 'OK' }]
-    );
-  };
+  }, [arenaId, navigation]);
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#00E5FF" />
+        <ActivityIndicator size="large" color="#F97316" />
         <Text style={styles.loadingText}>Loading arena details...</Text>
       </View>
     );
@@ -81,127 +75,112 @@ const ArenaDetailsScreen: React.FC<ArenaDetailsScreenProps> = ({ route, navigati
     return null;
   }
 
+  const showRating = arena.rating > 0 && arena.totalRatings > 0;
+
   return (
     <View style={styles.container}>
-      {/* Header with Back Button */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backIcon}>←</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Arena Details</Text>
-        <View style={styles.headerRight} />
+        <NotificationBell navigation={navigation} dark />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Arena Image */}
-        <View style={styles.imageContainer}>
-          {arena.images && arena.images.length > 0 ? (
-            <Image
-              source={{ uri: arena.images[0] }}
-              style={styles.arenaImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.placeholderImage}>
-              <Text style={styles.placeholderEmoji}>🏟️</Text>
-            </View>
-          )}
-        </View>
+        <Image
+          source={{ uri: arena.images?.[0] || 'https://placehold.co/600x400/111827/E5E7EB?text=Arena' }}
+          style={styles.heroImage}
+          resizeMode="cover"
+        />
 
-        {/* Arena Info Section */}
-        <View style={styles.infoSection}>
-          {/* Name and Rating */}
+        <View style={styles.body}>
           <View style={styles.titleRow}>
             <Text style={styles.arenaName}>{arena.name}</Text>
-            {arena.rating > 0 && (
-              <View style={styles.ratingBadge}>
-                <Text style={styles.ratingText}>⭐ {arena.rating.toFixed(1)}</Text>
-                <Text style={styles.ratingCount}>({arena.totalRatings})</Text>
+            {showRating ? (
+              <View style={styles.scoreBadge}>
+                <Text style={styles.scoreText}>{arena.rating.toFixed(1)}</Text>
+                <Text style={styles.scoreMeta}>{arena.totalRatings} reviews</Text>
               </View>
-            )}
+            ) : null}
           </View>
 
-          {/* Location */}
-          <View style={styles.locationRow}>
-            <Text style={styles.locationIcon}>📍</Text>
-            <Text style={styles.locationText}>{arena.location.address}, {arena.location.city}</Text>
+          <Text style={styles.locationText}>
+            {arena.location.address}
+            {arena.location.neighborhood ? ` | ${arena.location.neighborhood}` : ''}
+            {` | ${arena.location.city}`}
+          </Text>
+
+          <View style={styles.priceBanner}>
+            <Text style={styles.priceLabel}>Listed Rate</Text>
+            <Text style={styles.priceValue}>
+              NPR {arena.price}/{arena.priceUnit}
+            </Text>
           </View>
 
-          {/* Price */}
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Price:</Text>
-            <View style={styles.priceContainer}>
-              <Text style={styles.priceAmount}>NPR {arena.price}</Text>
-              <Text style={styles.priceUnit}>/{arena.priceUnit}</Text>
+          {arena.description ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>About the venue</Text>
+              <Text style={styles.sectionText}>{arena.description}</Text>
             </View>
-          </View>
+          ) : null}
 
-          {/* Description */}
-          {arena.description && (
-            <View style={styles.descriptionSection}>
-              <Text style={styles.sectionTitle}>About</Text>
-              <Text style={styles.descriptionText}>{arena.description}</Text>
-            </View>
-          )}
-
-          {/* Details Grid */}
-          <View style={styles.detailsGrid}>
-            <View style={styles.detailCard}>
-              <Text style={styles.detailIcon}>⚽</Text>
-              <Text style={styles.detailValue}>{arena.surfaceType}</Text>
-              <Text style={styles.detailLabel}>Surface</Text>
-            </View>
-
-            <View style={styles.detailCard}>
-              <Text style={styles.detailIcon}>👥</Text>
-              <Text style={styles.detailValue}>{arena.capacity}</Text>
-              <Text style={styles.detailLabel}>Capacity</Text>
-            </View>
-
-            <View style={styles.detailCard}>
-              <Text style={styles.detailIcon}>🕐</Text>
-              <Text style={styles.detailValue}>{arena.openingTime}</Text>
-              <Text style={styles.detailLabel}>Opens</Text>
-            </View>
-
-            <View style={styles.detailCard}>
-              <Text style={styles.detailIcon}>🕘</Text>
-              <Text style={styles.detailValue}>{arena.closingTime}</Text>
-              <Text style={styles.detailLabel}>Closes</Text>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Venue snapshot</Text>
+            <View style={styles.snapshotGrid}>
+              <View style={styles.snapshotCard}>
+                <Text style={styles.snapshotLabel}>Surface</Text>
+                <Text style={styles.snapshotValue}>{arena.surfaceType}</Text>
+              </View>
+              <View style={styles.snapshotCard}>
+                <Text style={styles.snapshotLabel}>Capacity</Text>
+                <Text style={styles.snapshotValue}>{arena.capacity} players</Text>
+              </View>
+              <View style={styles.snapshotCard}>
+                <Text style={styles.snapshotLabel}>Opens</Text>
+                <Text style={styles.snapshotValue}>{arena.openingTime}</Text>
+              </View>
+              <View style={styles.snapshotCard}>
+                <Text style={styles.snapshotLabel}>Closes</Text>
+                <Text style={styles.snapshotValue}>{arena.closingTime}</Text>
+              </View>
             </View>
           </View>
 
-          {/* Facilities */}
-          {arena.facilities && arena.facilities.length > 0 && (
-            <View style={styles.facilitiesSection}>
+          {arena.facilities?.length ? (
+            <View style={styles.section}>
               <Text style={styles.sectionTitle}>Facilities</Text>
               <View style={styles.facilitiesGrid}>
-                {arena.facilities.map((facility, index) => (
-                  <View key={index} style={styles.facilityChip}>
-                    <Text style={styles.facilityText}>✓ {facility}</Text>
+                {arena.facilities.map((facility) => (
+                  <View key={facility} style={styles.facilityChip}>
+                    <Text style={styles.facilityText}>{facility}</Text>
                   </View>
                 ))}
               </View>
             </View>
-          )}
+          ) : null}
 
-          {/* Bottom Spacing */}
+          {arena.contactPhone ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Contact</Text>
+              <View style={styles.contactRow}>
+                <Text style={styles.contactLabel}>Phone</Text>
+                <Text style={styles.contactValue}>{arena.contactPhone}</Text>
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.bottomSpacer} />
         </View>
       </ScrollView>
 
-      {/* Fixed Book Button */}
-      <View style={styles.bookButtonContainer}>
+      <View style={styles.footer}>
         <TouchableOpacity
-          style={styles.bookButton}
-          onPress={handleBookNow}
-          activeOpacity={0.8}
+          style={styles.primaryButton}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('BookingScreen', { arenaId: arena._id })}
         >
-          <Text style={styles.bookButtonText}>Book Now</Text>
-          <Text style={styles.bookButtonSubtext}>NPR {arena.price}/{arena.priceUnit}</Text>
+          <Text style={styles.primaryButtonText}>Book This Arena</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -211,243 +190,205 @@ const ArenaDetailsScreen: React.FC<ArenaDetailsScreenProps> = ({ route, navigati
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D1A',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    backgroundColor: '#1C1C2E',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2A2A45',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2A2A45',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: 24,
-    color: '#FFFFFF',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  headerRight: {
-    width: 40,
+    backgroundColor: '#F5F1E8',
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#0D0D1A',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F5F1E8',
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666688',
+    marginTop: 14,
+    color: '#5A6572',
+    fontSize: 15,
+  },
+  header: {
+    paddingTop: 54,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#12212B',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    backgroundColor: '#243744',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  backText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
   },
   content: {
     flex: 1,
   },
-  imageContainer: {
+  heroImage: {
     width: '100%',
-    height: 250,
-    backgroundColor: '#2A2A45',
+    height: 260,
   },
-  arenaImage: {
-    width: '100%',
-    height: '100%',
-  },
-  placeholderImage: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderEmoji: {
-    fontSize: 80,
-  },
-  infoSection: {
+  body: {
     padding: 20,
   },
   titleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    gap: 12,
   },
   arenaName: {
     flex: 1,
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginRight: 12,
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#12212B',
   },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2A2A45',
+  scoreBadge: {
+    backgroundColor: '#12212B',
+    borderRadius: 18,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  ratingText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginRight: 4,
-  },
-  ratingCount: {
-    fontSize: 12,
-    color: '#666688',
-  },
-  locationRow: {
-    flexDirection: 'row',
+    paddingVertical: 8,
     alignItems: 'center',
-    marginBottom: 16,
   },
-  locationIcon: {
+  scoreText: {
+    color: '#FFFFFF',
     fontSize: 16,
-    marginRight: 8,
+    fontWeight: '800',
+  },
+  scoreMeta: {
+    color: '#D6DEE5',
+    fontSize: 11,
+    marginTop: 2,
   },
   locationText: {
-    flex: 1,
+    marginTop: 10,
+    color: '#5F6B74',
     fontSize: 15,
-    color: '#a0aec0',
+    lineHeight: 21,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#2A2A45',
-    marginBottom: 20,
+  priceBanner: {
+    marginTop: 18,
+    backgroundColor: '#FFF8EC',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#F1DFC0',
   },
   priceLabel: {
-    fontSize: 16,
-    color: '#a0aec0',
+    color: '#9A4B14',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.9,
   },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+  priceValue: {
+    marginTop: 8,
+    color: '#12212B',
+    fontSize: 28,
+    fontWeight: '800',
   },
-  priceAmount: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#00E5FF',
-  },
-  priceUnit: {
-    fontSize: 14,
-    color: '#666688',
-    marginLeft: 4,
-  },
-  descriptionSection: {
-    marginBottom: 24,
+  section: {
+    marginTop: 24,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#12212B',
+    fontSize: 20,
+    fontWeight: '800',
     marginBottom: 12,
   },
-  descriptionText: {
+  sectionText: {
+    color: '#495661',
     fontSize: 15,
-    color: '#a0aec0',
     lineHeight: 22,
   },
-  detailsGrid: {
+  snapshotGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -6,
-    marginBottom: 24,
+    gap: 12,
   },
-  detailCard: {
-    width: '50%',
-    paddingHorizontal: 6,
-    marginBottom: 12,
+  snapshotCard: {
+    width: '47%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E6DCC8',
   },
-  detailIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  detailValue: {
-    fontSize: 16,
+  snapshotLabel: {
+    color: '#7A8188',
+    fontSize: 12,
     fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
-  detailLabel: {
-    fontSize: 13,
-    color: '#666688',
-  },
-  facilitiesSection: {
-    marginBottom: 24,
+  snapshotValue: {
+    marginTop: 8,
+    color: '#12212B',
+    fontSize: 17,
+    fontWeight: '800',
   },
   facilitiesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -4,
+    gap: 10,
   },
   facilityChip: {
-    backgroundColor: '#2A2A45',
-    paddingHorizontal: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
-    margin: 4,
+    borderWidth: 1,
+    borderColor: '#E6DCC8',
   },
   facilityText: {
-    fontSize: 14,
-    color: '#00E5FF',
-    fontWeight: '600',
+    color: '#36414A',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  contactRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  contactLabel: {
+    color: '#7A8188',
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  contactValue: {
+    color: '#12212B',
+    fontSize: 15,
+    fontWeight: '700',
   },
   bottomSpacer: {
-    height: 100,
+    height: 90,
   },
-  bookButtonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    backgroundColor: '#1C1C2E',
+  footer: {
+    padding: 18,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#2A2A45',
+    borderTopColor: '#E6DCC8',
   },
-  bookButton: {
-    backgroundColor: '#00E5FF',
+  primaryButton: {
+    backgroundColor: '#F97316',
+    borderRadius: 18,
     paddingVertical: 16,
-    borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#00E5FF',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  bookButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0D0D1A',
-  },
-  bookButtonSubtext: {
-    fontSize: 13,
-    color: '#0D0D1A',
-    marginTop: 2,
-    opacity: 0.7,
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
 });
 

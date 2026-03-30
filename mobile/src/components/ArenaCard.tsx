@@ -5,10 +5,7 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
 } from 'react-native';
-
-const { width } = Dimensions.get('window');
 
 export interface Arena {
   _id: string;

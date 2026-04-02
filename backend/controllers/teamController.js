@@ -13,14 +13,11 @@ exports.createTeam = async (req, res) => {
     }
 
     // Check if user already has a team
-    const existingTeam = await Team.findOne({ 
-      captain: req.user.id,
-      isActive: true 
-    });
+    const existingMembership = await User.findById(req.user.id).select('currentTeam');
 
-    if (existingTeam) {
+    if (existingMembership?.currentTeam) {
       return res.status(400).json({ 
-        message: 'You already have an active team. You can only create one team at a time.' 
+        message: 'You are already part of a team. Leave your current team before creating a new one.' 
       });
     }
 
@@ -101,10 +98,13 @@ exports.getTeamById = async (req, res) => {
 // @access  Private
 exports.getMyTeam = async (req, res) => {
   try {
-    const team = await Team.findOne({ 
-      captain: req.user.id,
-      isActive: true 
-    })
+    const user = await User.findById(req.user.id).select('currentTeam');
+
+    if (!user?.currentTeam) {
+      return res.status(404).json({ message: 'You don\'t have a team yet' });
+    }
+
+    const team = await Team.findById(user.currentTeam)
       .populate('captain', 'name email phone')
       .populate('members.user', 'name position skillLevel profileImage');
 
@@ -145,6 +145,15 @@ exports.addMember = async (req, res) => {
       return res.status(400).json({ message: 'Team is full' });
     }
 
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.currentTeam) {
+      return res.status(400).json({ message: 'This player is already in a team' });
+    }
+
     // Check if user is already in team
     const isMember = team.members.some(
       member => member.user.toString() === userId
@@ -173,6 +182,46 @@ exports.addMember = async (req, res) => {
       data: updatedTeam
     });
 
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Leave team
+// @route   DELETE /api/teams/:id/leave
+// @access  Private
+exports.leaveTeam = async (req, res) => {
+  try {
+    const team = await Team.findById(req.params.id);
+
+    if (!team) {
+      return res.status(404).json({ message: 'Team not found' });
+    }
+
+    if (team.captain.toString() === req.user.id) {
+      return res.status(400).json({ message: 'Team captain cannot leave directly. Delete the team or transfer leadership first.' });
+    }
+
+    const isMember = team.members.some((member) => member.user.toString() === req.user.id);
+
+    if (!isMember) {
+      return res.status(400).json({ message: 'You are not a member of this team' });
+    }
+
+    team.members = team.members.filter((member) => member.user.toString() !== req.user.id);
+    await team.save();
+
+    await User.findByIdAndUpdate(req.user.id, { currentTeam: null });
+
+    const updatedTeam = await Team.findById(team._id)
+      .populate('captain', 'name email phone')
+      .populate('members.user', 'name position skillLevel profileImage');
+
+    res.json({
+      success: true,
+      message: 'You left the team successfully',
+      data: updatedTeam,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

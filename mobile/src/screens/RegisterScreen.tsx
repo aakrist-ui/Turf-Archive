@@ -22,6 +22,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState<'user' | 'owner'>('user');
   const [loading, setLoading] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
@@ -60,6 +61,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
         name: normalizedName,
         email: normalizedEmail,
         password,
+        role,
       });
 
       Alert.alert(
@@ -111,6 +113,26 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
 
             {/* Input Section */}
             <View style={styles.inputSection}>
+              <View style={styles.inputWrapper}>
+                <Text style={styles.label}>Account Type</Text>
+                <View style={styles.roleRow}>
+                  <TouchableOpacity
+                    style={[styles.roleButton, role === 'user' && styles.roleButtonActive]}
+                    onPress={() => setRole('user')}
+                    disabled={loading}
+                  >
+                    <Text style={[styles.roleText, role === 'user' && styles.roleTextActive]}>Player</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.roleButton, role === 'owner' && styles.roleButtonActive]}
+                    onPress={() => setRole('owner')}
+                    disabled={loading}
+                  >
+                    <Text style={[styles.roleText, role === 'owner' && styles.roleTextActive]}>Futsal Owner</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
               {/* Name Input */}
               <View style={styles.inputWrapper}>
                 <Text style={styles.label}>Full Name</Text>
@@ -302,6 +324,31 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     marginBottom: 16,
+  },
+  roleRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  roleButton: {
+    flex: 1,
+    backgroundColor: '#252b3b',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#252b3b',
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  roleButtonActive: {
+    backgroundColor: '#2d3548',
+    borderColor: '#4c9aff',
+  },
+  roleText: {
+    color: '#cbd5e0',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  roleTextActive: {
+    color: '#ffffff',
   },
   label: {
     fontSize: 14,

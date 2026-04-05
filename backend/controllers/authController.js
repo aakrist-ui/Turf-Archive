@@ -8,9 +8,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-me';
 // REGISTER
 exports.register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
     const normalizedName = typeof name === 'string' ? name.trim() : '';
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const normalizedRole = role === 'owner' ? 'owner' : 'user';
 
     // Validation
     if (!normalizedName || !normalizedEmail || !password) {
@@ -29,7 +30,8 @@ exports.register = async (req, res) => {
     const user = await User.create({
       name: normalizedName,
       email: normalizedEmail,
-      password: hashedPassword
+      password: hashedPassword,
+      role: normalizedRole,
     });
 
     res.status(201).json({ 
@@ -37,7 +39,8 @@ exports.register = async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        role: user.role,
       }
     });
 

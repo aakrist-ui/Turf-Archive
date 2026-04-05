@@ -7,6 +7,7 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const teamRoutes = require('./routes/teamRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const userRoutes = require('./routes/userRoutes');
+const ownerRoutes = require('./routes/ownerRoutes');
 
 const app = express();
 
@@ -24,5 +25,6 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/owner', ownerRoutes);
 
 module.exports = app;

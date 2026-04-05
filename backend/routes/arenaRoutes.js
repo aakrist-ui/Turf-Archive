@@ -8,7 +8,7 @@ const {
   updateArena,
   deleteArena
 } = require('../controllers/arenaController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Public routes
 router.get('/', getAllArenas);
@@ -16,8 +16,8 @@ router.get('/:id', getArenaById);
 router.get('/:id/slots/:date', getAvailableSlots);
 
 // Admin only
-router.post('/', protect, createArena);
-router.put('/:id', protect, updateArena);
-router.delete('/:id', protect, deleteArena);
+router.post('/', protect, authorize('admin'), createArena);
+router.put('/:id', protect, authorize('admin'), updateArena);
+router.delete('/:id', protect, authorize('admin'), deleteArena);
 
 module.exports = router;

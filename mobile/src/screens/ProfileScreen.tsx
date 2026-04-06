@@ -27,7 +27,7 @@ interface ProfileData {
 const positions = ['Any', 'Goalkeeper', 'Defender', 'Midfielder', 'Forward'];
 
 const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { logout, updateUser } = useAuth();
+  const { logout, updateUser, user } = useAuth();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,7 +82,7 @@ const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
-        <NotificationBell navigation={navigation} dark />
+        {user?.role === 'owner' ? null : <NotificationBell navigation={navigation} dark />}
       </View>
 
       <ScrollView
@@ -102,55 +102,68 @@ const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               </View>
               <Text style={styles.profileName}>{profile.name}</Text>
               <Text style={styles.profileEmail}>{profile.email}</Text>
-              <Text style={styles.profileMeta}>{profile.position || 'Any'}</Text>
+              <Text style={styles.profileRole}>{profile.role === 'owner' ? 'Futsal Owner' : 'Player'}</Text>
             </View>
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Personal Details</Text>
-              <TextInput
-                style={styles.input}
-                value={profile.name}
-                onChangeText={(value) => setProfile((current) => (current ? { ...current, name: value } : current))}
-              />
-              <TextInput
-                style={styles.input}
-                value={profile.phone || ''}
-                placeholder="Phone number"
-                placeholderTextColor="#8A949C"
-                onChangeText={(value) => setProfile((current) => (current ? { ...current, phone: value } : current))}
-              />
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={profile.bio || ''}
-                placeholder="Short bio"
-                placeholderTextColor="#8A949C"
-                multiline
-                onChangeText={(value) => setProfile((current) => (current ? { ...current, bio: value } : current))}
-              />
-            </View>
+            {user?.role === 'owner' ? null : (
+              <>
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Personal Details</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={profile.name}
+                    onChangeText={(value) => setProfile((current) => (current ? { ...current, name: value } : current))}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    value={profile.phone || ''}
+                    placeholder="Phone number"
+                    placeholderTextColor="#8A949C"
+                    onChangeText={(value) => setProfile((current) => (current ? { ...current, phone: value } : current))}
+                  />
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={profile.bio || ''}
+                    placeholder="Short bio"
+                    placeholderTextColor="#8A949C"
+                    multiline
+                    onChangeText={(value) => setProfile((current) => (current ? { ...current, bio: value } : current))}
+                  />
+                </View>
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Position</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
-                {positions.map((position) => (
-                  <TouchableOpacity
-                    key={position}
-                    style={[styles.choiceChip, profile.position === position && styles.choiceChipActive]}
-                    onPress={() => setProfile((current) => (current ? { ...current, position } : current))}
-                  >
-                    <Text style={[styles.choiceText, profile.position === position && styles.choiceTextActive]}>{position}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Position</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
+                    {positions.map((position) => (
+                      <TouchableOpacity
+                        key={position}
+                        style={[styles.choiceChip, profile.position === position && styles.choiceChipActive]}
+                        onPress={() => setProfile((current) => (current ? { ...current, position } : current))}
+                      >
+                        <Text style={[styles.choiceText, profile.position === position && styles.choiceTextActive]}>{position}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
 
-            <TouchableOpacity style={styles.primaryButton} onPress={handleSave} disabled={saving}>
-              <Text style={styles.primaryButtonText}>{saving ? 'Saving...' : 'Save Profile'}</Text>
-            </TouchableOpacity>
+                <TouchableOpacity style={styles.primaryButton} onPress={handleSave} disabled={saving}>
+                  <Text style={styles.primaryButtonText}>{saving ? 'Saving...' : 'Save Profile'}</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('TeamHub')}>
-              <Text style={styles.secondaryButtonText}>Open Team Management</Text>
-            </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('TeamHub')}>
+                  <Text style={styles.secondaryButtonText}>Open Team Management</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {user?.role === 'owner' ? (
+              <View style={styles.ownerInfoCard}>
+                <Text style={styles.ownerInfoLabel}>Name</Text>
+                <Text style={styles.ownerInfoValue}>{profile.name}</Text>
+                <Text style={[styles.ownerInfoLabel, styles.ownerInfoLabelSpacing]}>Email</Text>
+                <Text style={styles.ownerInfoValue}>{profile.email}</Text>
+              </View>
+            ) : null}
 
             <TouchableOpacity style={styles.logoutButton} onPress={logout}>
               <Text style={styles.logoutButtonText}>Log Out</Text>
@@ -184,7 +197,11 @@ const styles = StyleSheet.create({
   avatarText: { color: '#FFFFFF', fontSize: 36, fontWeight: '800' },
   profileName: { color: '#FFFFFF', fontSize: 24, fontWeight: '800', marginTop: 14 },
   profileEmail: { color: '#D6DEE5', fontSize: 14, marginTop: 6 },
-  profileMeta: { color: '#F3C574', fontSize: 13, fontWeight: '700', marginTop: 10 },
+  profileRole: { color: '#D6DEE5', fontSize: 12, marginTop: 6, textTransform: 'capitalize' },
+  ownerInfoCard: { marginTop: 24, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18 },
+  ownerInfoLabel: { color: '#6B7280', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  ownerInfoLabelSpacing: { marginTop: 16 },
+  ownerInfoValue: { marginTop: 6, color: '#12212B', fontSize: 16, fontWeight: '700' },
   section: { marginTop: 24 },
   sectionTitle: { color: '#12212B', fontSize: 20, fontWeight: '800', marginBottom: 12 },
   input: {

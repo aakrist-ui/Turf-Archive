@@ -8,6 +8,7 @@ const teamRoutes = require('./routes/teamRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const userRoutes = require('./routes/userRoutes');
 const ownerRoutes = require('./routes/ownerRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
@@ -26,5 +27,6 @@ app.use('/api/teams', teamRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/owner', ownerRoutes);
+app.use('/api/admin', adminRoutes);
 
 module.exports = app;

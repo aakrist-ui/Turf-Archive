@@ -22,6 +22,10 @@ import OwnerDashboardScreen from '../screens/OwnerDashboardScreen';
 import OwnerArenasScreen from '../screens/OwnerArenasScreen';
 import OwnerArenaEditorScreen from '../screens/OwnerArenaEditorScreen';
 import OwnerBookingsScreen from '../screens/OwnerBookingsScreen';
+import AdminDashboardScreen from '../screens/AdminDashboardScreen';
+import AdminUsersScreen from '../screens/AdminUsersScreen';
+import AdminArenasScreen from '../screens/AdminArenasScreen';
+import AdminBookingsScreen from '../screens/AdminBookingsScreen';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -57,6 +61,9 @@ const DashboardTabIcon = ({ focused }: { focused: boolean }) => <Text style={ico
 const ReservationTabIcon = ({ focused }: { focused: boolean }) => <Text style={iconStyle(focused)}>R</Text>;
 const OwnerArenaTabIcon = ({ focused }: { focused: boolean }) => <Text style={iconStyle(focused)}>A</Text>;
 const OwnerProfileTabIcon = ({ focused }: { focused: boolean }) => <Text style={iconStyle(focused)}>P</Text>;
+const AdminUsersTabIcon = ({ focused }: { focused: boolean }) => <Text style={iconStyle(focused)}>U</Text>;
+const AdminArenaTabIcon = ({ focused }: { focused: boolean }) => <Text style={iconStyle(focused)}>A</Text>;
+const AdminBookingTabIcon = ({ focused }: { focused: boolean }) => <Text style={iconStyle(focused)}>B</Text>;
 
 const AuthNavigator = () => (
   <AuthStack.Navigator
@@ -203,20 +210,87 @@ const OwnerTabs = () => (
   </Tab.Navigator>
 );
 
-const MainNavigator = ({ isOwner }: { isOwner: boolean }) => (
+const AdminTabs = () => (
+  <Tab.Navigator
+    screenOptions={{
+      headerShown: false,
+      tabBarStyle: {
+        backgroundColor: '#FFFFFF',
+        borderTopColor: '#E5E7EB',
+        borderTopWidth: 1,
+        height: 66,
+        paddingBottom: 8,
+        paddingTop: 6,
+      },
+      tabBarActiveTintColor: '#111827',
+      tabBarInactiveTintColor: '#6B7280',
+      tabBarLabelStyle: {
+        fontSize: 11,
+        fontWeight: '600',
+        marginBottom: 2,
+      },
+    }}
+  >
+    <Tab.Screen
+      name="AdminHome"
+      component={AdminDashboardScreen}
+      options={{
+        tabBarIcon: DashboardTabIcon,
+        tabBarLabel: 'Dashboard',
+      }}
+    />
+    <Tab.Screen
+      name="AdminUsers"
+      component={AdminUsersScreen}
+      options={{
+        tabBarIcon: AdminUsersTabIcon,
+        tabBarLabel: 'Users',
+      }}
+    />
+    <Tab.Screen
+      name="AdminArenas"
+      component={AdminArenasScreen}
+      options={{
+        tabBarIcon: AdminArenaTabIcon,
+        tabBarLabel: 'Arenas',
+      }}
+    />
+    <Tab.Screen
+      name="AdminBookings"
+      component={AdminBookingsScreen}
+      options={{
+        tabBarIcon: AdminBookingTabIcon,
+        tabBarLabel: 'Bookings',
+      }}
+    />
+    <Tab.Screen
+      name="Profile"
+      component={ProfileScreen}
+      options={{
+        tabBarIcon: OwnerProfileTabIcon,
+        tabBarLabel: 'Profile',
+      }}
+    />
+  </Tab.Navigator>
+);
+
+const MainNavigator = ({ role }: { role?: string }) => (
   <MainStack.Navigator
     screenOptions={{
       headerShown: false,
-      contentStyle: { backgroundColor: isOwner ? '#F3F4F6' : '#0D0D1A' },
+      contentStyle: { backgroundColor: role === 'user' ? '#0D0D1A' : '#F3F4F6' },
     }}
   >
-    <MainStack.Screen name="MainTabs" component={isOwner ? OwnerTabs : CustomerTabs} />
-    {!isOwner ? <MainStack.Screen name="ArenaDetails" component={ArenaDetailScreen} /> : null}
-    {!isOwner ? <MainStack.Screen name="BookingScreen" component={CreateBookingScreen} /> : null}
-    {!isOwner ? <MainStack.Screen name="ChatRoom" component={ChatRoomScreen} /> : null}
-    {!isOwner ? <MainStack.Screen name="TeamHub" component={TeamsScreen} /> : null}
-    {!isOwner ? <MainStack.Screen name="Notifications" component={NotificationsScreen} /> : null}
-    {isOwner ? <MainStack.Screen name="OwnerArenaEditor" component={OwnerArenaEditorScreen} /> : null}
+    <MainStack.Screen
+      name="MainTabs"
+      component={role === 'admin' ? AdminTabs : role === 'owner' ? OwnerTabs : CustomerTabs}
+    />
+    {role === 'user' ? <MainStack.Screen name="ArenaDetails" component={ArenaDetailScreen} /> : null}
+    {role === 'user' ? <MainStack.Screen name="BookingScreen" component={CreateBookingScreen} /> : null}
+    {role === 'user' ? <MainStack.Screen name="ChatRoom" component={ChatRoomScreen} /> : null}
+    {role === 'user' ? <MainStack.Screen name="TeamHub" component={TeamsScreen} /> : null}
+    {role === 'user' ? <MainStack.Screen name="Notifications" component={NotificationsScreen} /> : null}
+    {role === 'owner' ? <MainStack.Screen name="OwnerArenaEditor" component={OwnerArenaEditorScreen} /> : null}
   </MainStack.Navigator>
 );
 
@@ -225,7 +299,7 @@ const AppNavigator = () => {
 
   return (
     <NavigationContainer>
-      {userToken ? <MainNavigator isOwner={user?.role === 'owner'} /> : <AuthNavigator />}
+      {userToken ? <MainNavigator role={user?.role || 'user'} /> : <AuthNavigator />}
     </NavigationContainer>
   );
 };

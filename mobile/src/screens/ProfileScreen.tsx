@@ -82,7 +82,7 @@ const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
-        {user?.role === 'owner' ? null : <NotificationBell navigation={navigation} dark />}
+        {user?.role === 'user' ? <NotificationBell navigation={navigation} dark /> : null}
       </View>
 
       <ScrollView
@@ -102,10 +102,12 @@ const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               </View>
               <Text style={styles.profileName}>{profile.name}</Text>
               <Text style={styles.profileEmail}>{profile.email}</Text>
-              <Text style={styles.profileRole}>{profile.role === 'owner' ? 'Futsal Owner' : 'Player'}</Text>
+              <Text style={styles.profileRole}>
+                {profile.role === 'owner' ? 'Futsal Owner' : profile.role === 'admin' ? 'Admin' : 'Player'}
+              </Text>
             </View>
 
-            {user?.role === 'owner' ? null : (
+            {user?.role === 'user' ? (
               <>
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Personal Details</Text>
@@ -154,9 +156,9 @@ const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                   <Text style={styles.secondaryButtonText}>Open Team Management</Text>
                 </TouchableOpacity>
               </>
-            )}
+            ) : null}
 
-            {user?.role === 'owner' ? (
+            {user?.role !== 'user' ? (
               <View style={styles.ownerInfoCard}>
                 <Text style={styles.ownerInfoLabel}>Name</Text>
                 <Text style={styles.ownerInfoValue}>{profile.name}</Text>

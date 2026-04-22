@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import BrandMark from '../components/BrandMark';
 
 interface LoginScreenProps {
   navigation: any;
@@ -50,7 +51,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
       console.log('Login response:', response.data);
 
-      await login(response.data.token, response.data.user);
+      await login(response.data.token, response.data.user);//app to api login integration 
 
       Alert.alert('Success', 'Login successful');
       
@@ -75,6 +76,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         <View style={styles.inner}>
 
           <View style={styles.brandContainer}>
+            <BrandMark />
             <View style={styles.brandTextWrapper}>
               <Text style={styles.logoItalic}>Turf</Text>
               <Text style={styles.logo}>Archive</Text>

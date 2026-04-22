@@ -1,4 +1,9 @@
 const Arena = require('../models/arena');
+const mongoose = require('mongoose');
+const { findArenas, findArenaById } = require('../utils/localArenaStore');
+const { listActiveBookingsForArenaSlot, createCustomArena, updateCustomArena, deleteCustomArena } = require('../utils/localDevStore');
+
+const isDatabaseReady = () => mongoose.connection.readyState === 1;
 
 // @desc    Get all arenas
 // @route   GET /api/arenas
@@ -29,9 +34,11 @@ exports.getAllArenas = async (req, res) => {
       if (maxPrice) query.price.$lte = Number(maxPrice);
     }
 
-    const arenas = await Arena.find(query)
-      .select('-timeSlots') // Exclude time slots for list view
-      .sort({ rating: -1, totalRatings: -1, price: 1 });
+    const arenas = isDatabaseReady()
+      ? await Arena.find(query)
+          .select('-timeSlots') // Exclude time slots for list view
+          .sort({ rating: -1, totalRatings: -1, price: 1 })
+      : findArenas(query).map(({ timeSlots, ...arena }) => arena);
 
     res.json({
       success: true,
@@ -49,7 +56,9 @@ exports.getAllArenas = async (req, res) => {
 // @access  Public
 exports.getArenaById = async (req, res) => {
   try {
-    const arena = await Arena.findById(req.params.id);
+    const arena = isDatabaseReady()
+      ? await Arena.findById(req.params.id)
+      : findArenaById(req.params.id);
 
     if (!arena) {
       return res.status(404).json({ message: 'Arena not found' });
@@ -72,7 +81,9 @@ exports.getAvailableSlots = async (req, res) => {
   try {
     const { id, date } = req.params;
     
-    const arena = await Arena.findById(id);
+    const arena = isDatabaseReady()
+      ? await Arena.findById(id)
+      : findArenaById(id);
     if (!arena) {
       return res.status(404).json({ message: 'Arena not found' });
     }
@@ -82,29 +93,58 @@ exports.getAvailableSlots = async (req, res) => {
     requestedDate.setHours(0, 0, 0, 0);
 
     // Filter time slots for the requested date
-    const slotsForDate = arena.timeSlots.filter(slot => {
+    const slotsForDate = (arena.timeSlots || []).filter(slot => {
       const slotDate = new Date(slot.date);
       slotDate.setHours(0, 0, 0, 0);
       return slotDate.getTime() === requestedDate.getTime();
     });
 
-    // Generate time slots if none exist for this date
-    if (slotsForDate.length === 0) {
-      const generatedSlots = generateTimeSlots(
-        requestedDate,
-        arena.openingTime,
-        arena.closingTime
-      );
-      
-      return res.json({
-        success: true,
-        data: generatedSlots
+    const defaultSlots = generateTimeSlots(
+      requestedDate,
+      arena.openingTime,
+      arena.closingTime
+    );
+
+    const slotMap = new Map(
+      defaultSlots.map((slot) => [
+        `${slot.startTime}-${slot.endTime}`,
+        {
+          ...slot,
+          isBooked: false,
+        },
+      ])
+    );
+
+    slotsForDate.forEach((slot) => {
+      const key = `${slot.startTime}-${slot.endTime}`;
+      const existingSlot = slotMap.get(key);
+      const slotValue = typeof slot.toObject === 'function' ? slot.toObject() : slot;
+
+      slotMap.set(key, {
+        ...(existingSlot || {
+          date: requestedDate,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          isBooked: false,
+        }),
+        ...slotValue,
+        isBooked: slot.isBooked,
       });
-    }
+    });
+
+    const normalizedSlots = Array.from(slotMap.values())
+      .map((slot) => ({
+        ...slot,
+        isBooked: slot.isBooked || Boolean(
+          !isDatabaseReady() &&
+            listActiveBookingsForArenaSlot(id, requestedDate, slot.startTime, slot.endTime)
+        ),
+      }))
+      .sort((left, right) => left.startTime.localeCompare(right.startTime));
 
     res.json({
       success: true,
-      data: slotsForDate
+      data: normalizedSlots
     });
 
   } catch (error) {
@@ -117,6 +157,14 @@ exports.getAvailableSlots = async (req, res) => {
 // @access  Private/Admin
 exports.createArena = async (req, res) => {
   try {
+    if (!isDatabaseReady()) {
+      const arena = createCustomArena(req.body);
+      return res.status(201).json({
+        success: true,
+        data: arena
+      });
+    }
+
     const arena = await Arena.create(req.body);
 
     res.status(201).json({
@@ -134,6 +182,19 @@ exports.createArena = async (req, res) => {
 // @access  Private/Admin
 exports.updateArena = async (req, res) => {
   try {
+    if (!isDatabaseReady()) {
+      const arena = updateCustomArena(req.params.id, req.body);
+
+      if (!arena) {
+        return res.status(404).json({ message: 'Arena not found' });
+      }
+
+      return res.json({
+        success: true,
+        data: arena
+      });
+    }
+
     const arena = await Arena.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -159,6 +220,19 @@ exports.updateArena = async (req, res) => {
 // @access  Private/Admin
 exports.deleteArena = async (req, res) => {
   try {
+    if (!isDatabaseReady()) {
+      const deleted = deleteCustomArena(req.params.id);
+
+      if (!deleted) {
+        return res.status(404).json({ message: 'Arena not found' });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Arena deleted successfully'
+      });
+    }
+
     const arena = await Arena.findByIdAndDelete(req.params.id);
 
     if (!arena) {

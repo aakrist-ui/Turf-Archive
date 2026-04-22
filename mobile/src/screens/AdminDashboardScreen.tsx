@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import BrandMark from '../components/BrandMark';
 import api from '../services/api';
 
 interface Summary {
@@ -30,10 +31,10 @@ const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   }, [loadSummary]);
 
   const cards = [
-    { label: 'Users', value: summary.users, screen: 'AdminUsers' },
-    { label: 'Owners', value: summary.owners, screen: 'AdminUsers' },
-    { label: 'Arenas', value: summary.arenas, screen: 'AdminArenas' },
-    { label: 'Bookings', value: summary.bookings, screen: 'AdminBookings' },
+    { label: 'Users', value: summary.users, screen: 'AdminUsers', params: undefined },
+    { label: 'Owners', value: summary.owners, screen: 'AdminUsers', params: { roleFilter: 'owner' } },
+    { label: 'Arenas', value: summary.arenas, screen: 'AdminArenas', params: undefined },
+    { label: 'Bookings', value: summary.bookings, screen: 'AdminBookings', params: undefined },
   ];
 
   useEffect(() => {
@@ -47,8 +48,13 @@ const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={loadSummary} tintColor="#111827" />}
     >
-      <Text style={styles.title}>Admin Dashboard</Text>
-      <Text style={styles.subtitle}>A simple overview of the system.</Text>
+      <View style={styles.hero}>
+        <BrandMark size={72} />
+        <View style={styles.heroText}>
+          <Text style={styles.title}>Admin Dashboard</Text>
+          <Text style={styles.subtitle}>A simple overview of the system.</Text>
+        </View>
+      </View>
 
       {loading ? (
         <View style={styles.loadingWrap}>
@@ -60,7 +66,7 @@ const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             key={card.label}
             style={styles.card}
             activeOpacity={0.85}
-            onPress={() => navigation.navigate(card.screen)}
+            onPress={() => navigation.navigate(card.screen, card.params)}
           >
             <Text style={styles.cardValue}>{card.value}</Text>
             <Text style={styles.cardLabel}>{card.label}</Text>
@@ -74,6 +80,15 @@ const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
   content: { padding: 20, paddingBottom: 100 },
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 8,
+  },
+  heroText: {
+    flex: 1,
+  },
   title: { fontSize: 28, fontWeight: '700', color: '#111827' },
   subtitle: { marginTop: 6, fontSize: 14, color: '#6B7280' },
   loadingWrap: { paddingVertical: 48, alignItems: 'center' },

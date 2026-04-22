@@ -1,0 +1,19 @@
+Turf Archive logo source
+
+File:
+- mobile/src/assets/turf-archive-logo.svg
+
+Source:
+- Original logo created in-project for Turf Archive.
+- Not copied from an external brand, website, icon pack, or stock source.
+
+Design meaning:
+- The orange curved form suggests a bold "T" and active movement.
+- The light blocks suggest records / listings, matching the "Archive" idea.
+- The orange ball mark keeps the futsal identity clear.
+
+Colors:
+- Deep navy: #12212B
+- Orange: #F97316
+- Sand: #F3C574
+- Warm light: #F5F1E8

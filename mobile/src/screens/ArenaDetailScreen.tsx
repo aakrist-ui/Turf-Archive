@@ -44,10 +44,6 @@ const ArenaDetailsScreen: React.FC<ArenaDetailsScreenProps> = ({ route, navigati
   const [arena, setArena] = useState<Arena | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchArenaDetails();
-  }, [fetchArenaDetails]);
-
   const fetchArenaDetails = useCallback(async () => {
     try {
       setLoading(true);
@@ -61,6 +57,10 @@ const ArenaDetailsScreen: React.FC<ArenaDetailsScreenProps> = ({ route, navigati
       setLoading(false);
     }
   }, [arenaId, navigation]);
+
+  useEffect(() => {
+    fetchArenaDetails();
+  }, [fetchArenaDetails]);
 
   if (loading) {
     return (

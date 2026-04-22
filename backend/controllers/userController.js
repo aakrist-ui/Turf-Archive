@@ -1,4 +1,8 @@
 const User = require('../models/user');
+const mongoose = require('mongoose');
+const { searchUsers: searchLocalUsers, findUserById, updateUser } = require('../utils/localDevStore');
+
+const isDatabaseReady = () => mongoose.connection.readyState === 1;
 
 exports.searchUsers = async (req, res) => {
   try {
@@ -12,10 +16,12 @@ exports.searchUsers = async (req, res) => {
       ];
     }
 
-    const users = await User.find(query)
-      .select('name email position skillLevel profileImage currentTeam bio phone')
-      .sort('name')
-      .limit(30);
+    const users = isDatabaseReady()
+      ? await User.find(query)
+          .select('name email position skillLevel profileImage currentTeam bio phone')
+          .sort('name')
+          .limit(30)
+      : searchLocalUsers(q, req.user.id).map(({ password, ...user }) => user);
 
     res.json({
       success: true,
@@ -29,9 +35,19 @@ exports.searchUsers = async (req, res) => {
 
 exports.getMyProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id)
-      .select('-password')
-      .populate('currentTeam', 'name');
+    const user = isDatabaseReady()
+      ? await User.findById(req.user.id)
+          .select('-password')
+          .populate('currentTeam', 'name')
+      : (() => {
+          const localUser = findUserById(req.user.id);
+          if (!localUser) {
+            return null;
+          }
+
+          const { password, ...safeUser } = localUser;
+          return safeUser;
+        })();
 
     res.json({
       success: true,
@@ -57,12 +73,22 @@ exports.updateMyProfile = async (req, res) => {
       return res.status(400).json({ message: 'Name cannot be empty' });
     }
 
-    const user = await User.findByIdAndUpdate(req.user.id, updates, {
-      new: true,
-      runValidators: true,
-    })
-      .select('-password')
-      .populate('currentTeam', 'name');
+    const user = isDatabaseReady()
+      ? await User.findByIdAndUpdate(req.user.id, updates, {
+          new: true,
+          runValidators: true,
+        })
+          .select('-password')
+          .populate('currentTeam', 'name')
+      : (() => {
+          const updatedUser = updateUser(req.user.id, updates);
+          if (!updatedUser) {
+            return null;
+          }
+
+          const { password, ...safeUser } = updatedUser;
+          return safeUser;
+        })();
 
     res.json({
       success: true,

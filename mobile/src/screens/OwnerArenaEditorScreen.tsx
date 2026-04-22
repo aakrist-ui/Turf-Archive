@@ -28,6 +28,13 @@ const defaultForm = {
   isActive: true,
 };
 
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const OwnerArenaEditorScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const arenaId = route.params?.arenaId as string | null;
   const isEditing = Boolean(arenaId);
@@ -35,10 +42,14 @@ const OwnerArenaEditorScreen: React.FC<{ navigation: any; route: any }> = ({ nav
   const [saving, setSaving] = useState(false);
   const [slotSaving, setSlotSaving] = useState(false);
   const [form, setForm] = useState(defaultForm);
-  const [slotDate, setSlotDate] = useState(new Date().toISOString().slice(0, 10));
+  const [slotDate, setSlotDate] = useState(formatLocalDate(new Date()));
   const [slotText, setSlotText] = useState('06:00-07:00\n07:00-08:00\n08:00-09:00');
 
   const screenTitle = useMemo(() => (isEditing ? 'Edit Arena' : 'Add Arena'), [isEditing]);
+
+  const handleBackToOwnerSection = () => {
+    navigation.navigate('MainTabs', { screen: 'OwnerHome' });
+  };
 
   const loadArena = useCallback(async () => {
     if (!arenaId) {
@@ -52,7 +63,7 @@ const OwnerArenaEditorScreen: React.FC<{ navigation: any; route: any }> = ({ nav
 
       if (!arena) {
         Alert.alert('Arena not found', 'This arena is not available anymore.');
-        navigation.goBack();
+        handleBackToOwnerSection();
         return;
       }
 
@@ -122,7 +133,7 @@ const OwnerArenaEditorScreen: React.FC<{ navigation: any; route: any }> = ({ nav
       Alert.alert('Saved', 'Arena details have been updated.', [
         {
           text: 'OK',
-          onPress: () => navigation.goBack(),
+          onPress: handleBackToOwnerSection,
         },
       ]);
     } catch (error: any) {
@@ -147,7 +158,7 @@ const OwnerArenaEditorScreen: React.FC<{ navigation: any; route: any }> = ({ nav
             setSaving(true);
             await api.delete(`/owner/arenas/${arenaId}`);
             Alert.alert('Deleted', 'Arena removed successfully.', [
-              { text: 'OK', onPress: () => navigation.goBack() },
+              { text: 'OK', onPress: handleBackToOwnerSection },
             ]);
           } catch (error: any) {
             Alert.alert('Could not delete arena', error.response?.data?.message || 'Please try again.');
@@ -199,6 +210,12 @@ const OwnerArenaEditorScreen: React.FC<{ navigation: any; route: any }> = ({ nav
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBackToOwnerSection}>
+          <Text style={styles.backButtonText}>Back to Home Page</Text>
+        </TouchableOpacity>
+      </View>
+
       <Text style={styles.pageTitle}>{screenTitle}</Text>
 
       <View style={styles.section}>
@@ -239,6 +256,10 @@ const OwnerArenaEditorScreen: React.FC<{ navigation: any; route: any }> = ({ nav
 
       <TouchableOpacity style={styles.primaryButton} onPress={handleSave} disabled={saving}>
         <Text style={styles.primaryButtonText}>{saving ? 'Saving...' : isEditing ? 'Update Arena' : 'Create Arena'}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.homeButton} onPress={handleBackToOwnerSection}>
+        <Text style={styles.homeButtonText}>Go to Owner Home</Text>
       </TouchableOpacity>
 
       {isEditing ? (
@@ -282,8 +303,17 @@ const FormInput = ({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
-  content: { padding: 20, paddingBottom: 120 },
+  content: { padding: 20, paddingTop: 28, paddingBottom: 120 },
   loadingScreen: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' },
+  headerRow: { marginBottom: 10 },
+  backButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#111827',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+  },
+  backButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   pageTitle: { fontSize: 26, fontWeight: '700', color: '#111827' },
   section: { marginTop: 18, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16 },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 12 },
@@ -303,6 +333,8 @@ const styles = StyleSheet.create({
   switchLabel: { flex: 1, marginRight: 12, color: '#111827', fontSize: 14, fontWeight: '500' },
   primaryButton: { marginTop: 18, backgroundColor: '#111827', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   primaryButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  homeButton: { marginTop: 12, backgroundColor: '#DBEAFE', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  homeButtonText: { color: '#1D4ED8', fontSize: 14, fontWeight: '700' },
   secondaryButton: { marginTop: 6, backgroundColor: '#E5E7EB', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   secondaryButtonText: { color: '#111827', fontSize: 14, fontWeight: '600' },
   deleteButton: { marginTop: 12, backgroundColor: '#FEE2E2', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },

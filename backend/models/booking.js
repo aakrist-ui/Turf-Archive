@@ -76,5 +76,14 @@ const bookingSchema = new mongoose.Schema({
 bookingSchema.index({ user: 1, date: -1 });
 bookingSchema.index({ arena: 1, date: 1 });
 bookingSchema.index({ status: 1 });
+bookingSchema.index(
+  { arena: 1, date: 1, startTime: 1, endTime: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: { $in: ['pending', 'confirmed', 'completed'] },
+    },
+  }
+);
 
 module.exports = mongoose.model('Booking', bookingSchema);

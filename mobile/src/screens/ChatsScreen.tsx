@@ -47,7 +47,8 @@ const formatTime = (value?: string) => {
 
 const ChatsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
-  const { chats, loading, refreshChats, markChatAsRead } = useChats();
+  const currentUserId = user?.id || (user as any)?._id;
+  const { chats, loading, refreshChats, markChatAsRead, isChatUnread } = useChats();
   const [users, setUsers] = useState<UserLite[]>([]);
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
@@ -92,10 +93,10 @@ const ChatsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       (chats as ChatItem[]).map((chat) => {
         const title = chat.isGroupChat
           ? chat.name || 'Group chat'
-          : chat.members.find((member) => member._id !== user?.id)?.name || 'Direct chat';
+          : chat.members.find((member) => member._id !== currentUserId)?.name || 'Direct chat';
         return { ...chat, title };
       }),
-    [chats, user?.id],
+    [chats, currentUserId],
   );
 
   return (
@@ -126,30 +127,41 @@ const ChatsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               <ActivityIndicator size="large" color="#F97316" />
             </View>
           ) : renderedChats.length ? (
-            renderedChats.map((chat) => (
-              <TouchableOpacity
-                key={chat._id}
-                style={styles.chatCard}
-                activeOpacity={0.85}
-                onPress={async () => {
-                  await markChatAsRead(chat._id);
-                  navigation.navigate('ChatRoom', { chatId: chat._id, recipientName: chat.title });
-                }}
-              >
-                <View style={styles.chatAvatar}>
-                  <Text style={styles.chatAvatarText}>{chat.isGroupChat ? '👥' : '💬'}</Text>
-                </View>
-                <View style={styles.chatInfo}>
-                  <View style={styles.chatTop}>
-                    <Text style={styles.chatTitle}>{chat.title}</Text>
-                    <Text style={styles.chatDate}>{formatTime(chat.lastMessage?.sentAt)}</Text>
+            renderedChats.map((chat) => {
+              const unread = isChatUnread(chat);
+
+              return (
+                <TouchableOpacity
+                  key={chat._id}
+                  style={[styles.chatCard, unread && styles.chatCardUnread]}
+                  activeOpacity={0.85}
+                  onPress={async () => {
+                    await markChatAsRead(chat._id);
+                    navigation.navigate('ChatRoom', { chatId: chat._id, recipientName: chat.title });
+                  }}
+                >
+                  <View style={[styles.chatAvatar, unread && styles.chatAvatarUnread]}>
+                    <Text style={styles.chatAvatarText}>{chat.isGroupChat ? 'GG' : 'DM'}</Text>
                   </View>
-                  <Text style={styles.chatPreview} numberOfLines={2}>
-                    {chat.lastMessage?.content || 'Start the conversation.'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))
+                  <View style={styles.chatInfo}>
+                    <View style={styles.chatTop}>
+                      <View style={styles.chatTitleWrap}>
+                        <Text style={[styles.chatTitle, unread && styles.chatTitleUnread]}>{chat.title}</Text>
+                        {unread ? (
+                          <View style={styles.unreadBadge}>
+                            <Text style={styles.unreadBadgeText}>NEW</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={[styles.chatDate, unread && styles.chatDateUnread]}>{formatTime(chat.lastMessage?.sentAt)}</Text>
+                    </View>
+                    <Text style={[styles.chatPreview, unread && styles.chatPreviewUnread]} numberOfLines={2}>
+                      {unread ? `NEW: ${chat.lastMessage?.content || 'Start the conversation.'}` : chat.lastMessage?.content || 'Start the conversation.'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
           ) : (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>No chats yet</Text>
@@ -173,7 +185,7 @@ const ChatsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               <TouchableOpacity style={styles.userInfo} activeOpacity={0.85} onPress={() => startDirectChat(player._id, player.name)}>
                 <Text style={styles.userName}>{player.name}</Text>
                 <Text style={styles.userMeta}>
-                  {player.position || 'Any'}{player.skillLevel ? ` • ${player.skillLevel}` : ''}
+                  {player.position || 'Any'}{player.skillLevel ? ` - ${player.skillLevel}` : ''}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.messageButton} onPress={() => startDirectChat(player._id, player.name)}>
@@ -219,13 +231,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  chatAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#12212B', alignItems: 'center', justifyContent: 'center' },
-  chatAvatarText: { fontSize: 20 },
+  chatCardUnread: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#F97316',
+  },
+  chatAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#12212B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatAvatarUnread: { backgroundColor: '#F97316' },
+  chatAvatarText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
   chatInfo: { flex: 1 },
   chatTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  chatTitleWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   chatTitle: { flex: 1, color: '#12212B', fontSize: 17, fontWeight: '800' },
+  chatTitleUnread: { color: '#C2410C' },
+  unreadBadge: {
+    backgroundColor: '#F97316',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  unreadBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
   chatDate: { color: '#8B5E1A', fontSize: 12, fontWeight: '700' },
-  chatPreview: { marginTop: 6, color: '#5F6B74', fontSize: 14, lineHeight: 20 },
+  chatDateUnread: { color: '#F97316' },
+  chatPreview: { marginTop: 6, color: '#12212B', fontSize: 14, lineHeight: 20 },
+  chatPreviewUnread: { color: '#F97316', fontWeight: '700' },
   emptyCard: { backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: '#E6DCC8', padding: 18 },
   emptyTitle: { color: '#12212B', fontSize: 20, fontWeight: '800' },
   emptyText: { marginTop: 8, color: '#5F6B74', fontSize: 14, lineHeight: 21 },

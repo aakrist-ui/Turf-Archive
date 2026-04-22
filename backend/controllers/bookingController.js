@@ -1,5 +1,17 @@
 const Booking = require('../models/booking');
 const Arena = require('../models/arena');
+const mongoose = require('mongoose');
+const {
+  createBooking: createLocalBooking,
+  findBookingById: findLocalBookingById,
+  listBookingsForUser,
+  updateBooking: updateLocalBooking,
+  listActiveBookingsForArenaSlot,
+  findUserById,
+} = require('../utils/localDevStore');
+const { findArenaById } = require('../utils/localArenaStore');
+
+const isDatabaseReady = () => mongoose.connection.readyState === 1;
 
 // @desc    Create new booking
 // @route   POST /api/bookings
@@ -14,7 +26,9 @@ exports.createBooking = async (req, res) => {
     }
 
     // Check if arena exists
-    const arenaDoc = await Arena.findById(arena);
+    const arenaDoc = isDatabaseReady()
+      ? await Arena.findById(arena)
+      : findArenaById(arena);
     if (!arenaDoc) {
       return res.status(404).json({ message: 'Arena not found' });
     }
@@ -25,39 +39,57 @@ exports.createBooking = async (req, res) => {
 
     // Check if slot is available
     const bookingDate = new Date(date);
-    const existingBooking = await Booking.findOne({
-      arena,
-      date: bookingDate,
-      startTime,
-      endTime,
-      status: { $nin: ['cancelled'] }
-    });
+    const existingBooking = isDatabaseReady()
+      ? await Booking.findOne({
+          arena,
+          date: bookingDate,
+          startTime,
+          endTime,
+          status: { $nin: ['cancelled'] }
+        })
+      : listActiveBookingsForArenaSlot(arena, bookingDate, startTime, endTime);
 
     if (existingBooking) {
-      return res.status(400).json({ message: 'This time slot is already booked' });
+      return res.status(400).json({ message: 'Already booked' });
     }
 
     // Create booking
-    const booking = await Booking.create({
-      arena,
-      user: req.user.id,
-      team: team || null,
-      date: bookingDate,
-      startTime,
-      endTime,
-      duration,
-      totalPrice,
-      notes,
-      paymentMethod: paymentMethod || 'cash',
-      status: 'confirmed'
-    });
+    const booking = isDatabaseReady()
+      ? await Booking.create({
+          arena,
+          user: req.user.id,
+          team: team || null,
+          date: bookingDate,
+          startTime,
+          endTime,
+          duration,
+          totalPrice,
+          notes,
+          paymentMethod: paymentMethod || 'cash',
+          status: 'confirmed'
+        })
+      : createLocalBooking({
+          arena,
+          user: req.user.id,
+          team: team || null,
+          date: bookingDate.toISOString(),
+          startTime,
+          endTime,
+          duration,
+          totalPrice,
+          notes,
+          paymentMethod: paymentMethod || 'cash',
+          status: 'confirmed'
+        });
 
     // Update arena time slots
     await updateArenaTimeSlot(arena, bookingDate, startTime, endTime, booking._id, true);
 
-    const populatedBooking = await Booking.findById(booking._id)
-      .populate('arena', 'name location price')
-      .populate('user', 'name email phone');
+    const populatedBooking = isDatabaseReady()
+      ? await Booking.findById(booking._id)
+          .populate('arena', 'name location price')
+          .populate('user', 'name email phone')
+      : decorateLocalBooking(booking);
 
     res.status(201).json({
       success: true,
@@ -65,6 +97,10 @@ exports.createBooking = async (req, res) => {
     });
 
   } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(400).json({ message: 'Already booked' });
+    }
+
     res.status(500).json({ message: error.message });
   }
 };
@@ -82,10 +118,12 @@ exports.getMyBookings = async (req, res) => {
       query.status = status;
     }
 
-    const bookings = await Booking.find(query)
-      .populate('arena', 'name location price images')
-      .populate('team', 'name')
-      .sort('-date');
+    const bookings = isDatabaseReady()
+      ? await Booking.find(query)
+          .populate('arena', 'name location price images')
+          .populate('team', 'name')
+          .sort('-date')
+      : listBookingsForUser(req.user.id, status).map(decorateLocalBookingByValue);
 
     res.json({
       success: true,
@@ -103,10 +141,12 @@ exports.getMyBookings = async (req, res) => {
 // @access  Private
 exports.getBookingById = async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id)
-      .populate('arena')
-      .populate('user', 'name email phone')
-      .populate('team');
+    const booking = isDatabaseReady()
+      ? await Booking.findById(req.params.id)
+          .populate('arena')
+          .populate('user', 'name email phone')
+          .populate('team')
+      : decorateLocalBookingByValue(findLocalBookingById(req.params.id));
 
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
@@ -134,7 +174,9 @@ exports.cancelBooking = async (req, res) => {
   try {
     const { cancellationReason } = req.body;
 
-    const booking = await Booking.findById(req.params.id);
+    const booking = isDatabaseReady()
+      ? await Booking.findById(req.params.id)
+      : findLocalBookingById(req.params.id);
 
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
@@ -151,12 +193,24 @@ exports.cancelBooking = async (req, res) => {
     }
 
     // Update booking status
-    booking.status = 'cancelled';
-    booking.cancelledAt = Date.now();
-    booking.cancelledBy = req.user.id;
-    booking.cancellationReason = cancellationReason || 'No reason provided';
-
-    await booking.save();
+    if (isDatabaseReady()) {
+      booking.status = 'cancelled';
+      booking.cancelledAt = Date.now();
+      booking.cancelledBy = req.user.id;
+      booking.cancellationReason = cancellationReason || 'No reason provided';
+      await booking.save();
+    } else {
+      updateLocalBooking(booking._id, {
+        status: 'cancelled',
+        cancelledAt: new Date().toISOString(),
+        cancelledBy: req.user.id,
+        cancellationReason: cancellationReason || 'No reason provided',
+      });
+      booking.status = 'cancelled';
+      booking.cancelledAt = new Date().toISOString();
+      booking.cancelledBy = req.user.id;
+      booking.cancellationReason = cancellationReason || 'No reason provided';
+    }
 
     // Update arena time slot
     await updateArenaTimeSlot(
@@ -184,10 +238,12 @@ exports.cancelBooking = async (req, res) => {
 // @access  Private/Admin
 exports.getAllBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find()
-      .populate('arena', 'name location')
-      .populate('user', 'name email')
-      .sort('-createdAt');
+    const bookings = isDatabaseReady()
+      ? await Booking.find()
+          .populate('arena', 'name location')
+          .populate('user', 'name email')
+          .sort('-createdAt')
+      : require('../utils/localDevStore').getBookings().map(decorateLocalBookingByValue);
 
     res.json({
       success: true,
@@ -207,11 +263,13 @@ exports.updateBookingStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
-    const booking = await Booking.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true, runValidators: true }
-    );
+    const booking = isDatabaseReady()
+      ? await Booking.findByIdAndUpdate(
+          req.params.id,
+          { status },
+          { new: true, runValidators: true }
+        )
+      : updateLocalBooking(req.params.id, { status });
 
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
@@ -241,6 +299,10 @@ function calculateDuration(startTime, endTime) {
 // Helper function to update arena time slot
 async function updateArenaTimeSlot(arenaId, date, startTime, endTime, bookingId, isBooked) {
   try {
+    if (!isDatabaseReady()) {
+      return;
+    }
+
     const arena = await Arena.findById(arenaId);
     if (!arena) return;
 
@@ -277,4 +339,38 @@ async function updateArenaTimeSlot(arenaId, date, startTime, endTime, bookingId,
   } catch (error) {
     console.error('Error updating arena time slot:', error);
   }
+}
+
+function decorateLocalBooking(booking) {
+  return Promise.resolve(decorateLocalBookingByValue(booking));
+}
+
+function decorateLocalBookingByValue(booking) {
+  if (!booking) {
+    return null;
+  }
+
+  const arena = findArenaById(booking.arena);
+  const user = findUserById(booking.user);
+
+  return {
+    ...booking,
+    arena: arena
+      ? {
+          _id: arena._id,
+          name: arena.name,
+          location: arena.location,
+          price: arena.price,
+          images: arena.images,
+        }
+      : booking.arena,
+    user: user
+      ? {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+        }
+      : booking.user,
+  };
 }

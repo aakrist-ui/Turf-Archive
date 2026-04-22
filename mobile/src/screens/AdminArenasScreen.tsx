@@ -10,9 +10,10 @@ interface AdminArena {
   owner?: { name?: string; email?: string };
 }
 
-const AdminArenasScreen: React.FC = () => {
+const AdminArenasScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [arenas, setArenas] = useState<AdminArena[]>([]);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const loadArenas = useCallback(async () => {
     try {
@@ -30,6 +31,25 @@ const AdminArenasScreen: React.FC = () => {
   useEffect(() => {
     loadArenas();
   }, [loadArenas]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', loadArenas);
+    return unsubscribe;
+  }, [loadArenas, navigation]);
+
+  const toggleArenaStatus = async (item: AdminArena) => {
+    try {
+      setUpdatingId(item._id);
+      const response = await api.put(`/admin/arenas/${item._id}/status`, {
+        isActive: !item.isActive,
+      });
+      setArenas((current) => current.map((arena) => (arena._id === item._id ? response.data.data : arena)));
+    } catch (error: any) {
+      Alert.alert('Could not update arena', error.response?.data?.message || 'Please try again.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   const deleteArena = async (item: AdminArena) => {
     Alert.alert('Delete arena', `Remove ${item.name}?`, [
@@ -62,6 +82,11 @@ const AdminArenasScreen: React.FC = () => {
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color="#111827" />
         </View>
+      ) : !arenas.length ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>No arenas found</Text>
+          <Text style={styles.emptyText}>Arena moderation tools will appear here once listings are available.</Text>
+        </View>
       ) : (
         arenas.map((item) => (
           <View key={item._id} style={styles.card}>
@@ -72,6 +97,11 @@ const AdminArenasScreen: React.FC = () => {
               Owner: {item.owner?.name || 'Seeded listing'} {item.owner?.email ? `| ${item.owner.email}` : ''}
             </Text>
             <Text style={styles.cardMeta}>{item.isActive ? 'active' : 'inactive'}</Text>
+            <TouchableOpacity style={styles.button} onPress={() => toggleArenaStatus(item)} disabled={updatingId === item._id}>
+              <Text style={styles.buttonText}>
+                {updatingId === item._id ? 'Saving...' : item.isActive ? 'Deactivate Arena' : 'Activate Arena'}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={() => deleteArena(item)}>
               <Text style={[styles.buttonText, styles.deleteButtonText]}>Delete</Text>
             </TouchableOpacity>
@@ -89,6 +119,9 @@ const styles = StyleSheet.create({
   subtitle: { marginTop: 6, fontSize: 14, color: '#6B7280' },
   loadingWrap: { paddingVertical: 48, alignItems: 'center' },
   card: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16 },
+  emptyCard: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 18 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  emptyText: { marginTop: 6, fontSize: 14, color: '#6B7280', lineHeight: 20 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
   cardMeta: { marginTop: 4, fontSize: 13, color: '#6B7280' },
   button: { marginTop: 12, backgroundColor: '#111827', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },

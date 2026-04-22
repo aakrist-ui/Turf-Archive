@@ -19,17 +19,19 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const groupedNotifications = useMemo(() => {
     const now = new Date();
 
-    return notifications.map((item) => {
-      const eventDate = new Date(item.eventTime);
-      const diffHours = Math.round((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60));
-      let label = formatEventTime(item.eventTime);
+    return [...notifications]
+      .sort((a, b) => new Date(b.eventTime).getTime() - new Date(a.eventTime).getTime())
+      .map((item) => {
+        const eventDate = new Date(item.eventTime);
+        const diffHours = Math.round((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60));
+        let label = formatEventTime(item.eventTime);
 
-      if (diffHours >= 0 && diffHours <= 24) {
-        label = diffHours <= 1 ? 'Starting soon' : `In ${diffHours} hrs`;
-      }
+        if (item.type === 'reminder' && diffHours >= 0 && diffHours <= 24) {
+          label = diffHours <= 1 ? 'Starting soon' : `In ${diffHours} hrs`;
+        }
 
-      return { ...item, label };
-    });
+        return { ...item, label };
+      });
   }, [notifications]);
 
   return (

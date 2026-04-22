@@ -7,7 +7,7 @@ const chatPopulate = [
   { path: 'members', select: 'name email position skillLevel profileImage currentTeam' },
   { path: 'admin', select: 'name email position profileImage' },
   { path: 'team', select: 'name' },
-  { path: 'lastMessage.sender', select: 'name' },
+  { path: 'lastMessage.sender', select: '_id name' },
 ];
 
 const isChatMember = (chat, userId) => chat.members.some((member) => member.toString() === userId.toString());

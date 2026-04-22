@@ -32,19 +32,26 @@ interface Arena {
   };
 }
 
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const getDateOption = (offset: number) => {
   const date = new Date();
   date.setDate(date.getDate() + offset);
   return {
     label: offset === 0 ? 'Today' : offset === 1 ? 'Tomorrow' : date.toLocaleDateString([], { weekday: 'short' }),
-    value: date.toISOString().split('T')[0],
+    value: formatLocalDate(date),
     subtitle: date.toLocaleDateString([], { month: 'short', day: 'numeric' }),
   };
 };
 
 const CreateBookingScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
   const { arenaId } = route.params;
-  const { refreshBookings } = useNotifications();
+  const { refreshBookings, upsertBooking, pushNotification } = useNotifications();
   const [arena, setArena] = useState<Arena | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedDate, setSelectedDate] = useState(getDateOption(0).value);
@@ -92,7 +99,7 @@ const CreateBookingScreen: React.FC<{ route: any; navigation: any }> = ({ route,
 
     try {
       setSubmitting(true);
-      await api.post('/bookings', {
+      const response = await api.post('/bookings', {
         arena: arena._id,
         date: selectedDate,
         startTime: selectedSlot.startTime,
@@ -101,6 +108,18 @@ const CreateBookingScreen: React.FC<{ route: any; navigation: any }> = ({ route,
         paymentMethod: 'cash',
       });
 
+      const savedBooking = response.data.data;
+
+      upsertBooking(savedBooking);
+      pushNotification({
+        id: `${savedBooking._id}-confirmed`,
+        title: 'Booking confirmed',
+        message: `${arena.name} is confirmed for ${selectedSlot.startTime} to ${selectedSlot.endTime}.`,
+        type: 'booking',
+        bookingId: savedBooking._id,
+        arenaId: arena._id,
+        eventTime: new Date().toISOString(),
+      });
       await refreshBookings();
       Alert.alert('Booking confirmed', `${arena.name} is booked for ${selectedSlot.startTime} to ${selectedSlot.endTime}.`, [
         {
@@ -109,7 +128,8 @@ const CreateBookingScreen: React.FC<{ route: any; navigation: any }> = ({ route,
         },
       ]);
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Could not complete the booking.';
+      const rawMessage = error.response?.data?.message;
+      const message = rawMessage === 'Already booked' ? 'Already booked' : rawMessage || 'Could not complete the booking.';
       Alert.alert('Booking failed', message);
     } finally {
       setSubmitting(false);

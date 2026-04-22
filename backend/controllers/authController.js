@@ -2,8 +2,11 @@ const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { sendResetPasswordEmail } = require('../utils/email');
+const mongoose = require('mongoose');
+const { createUser, findUserByEmail, findUserById, updateUser } = require('../utils/localDevStore');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-me';
+const isDatabaseReady = () => mongoose.connection.readyState === 1;
 
 // REGISTER
 exports.register = async (req, res) => {
@@ -19,7 +22,9 @@ exports.register = async (req, res) => {
     }
 
     // Check if user exists
-    const existingUser = await User.findOne({ email: normalizedEmail });
+    const existingUser = isDatabaseReady()
+      ? await User.findOne({ email: normalizedEmail })
+      : findUserByEmail(normalizedEmail);
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
@@ -27,12 +32,19 @@ exports.register = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
-      name: normalizedName,
-      email: normalizedEmail,
-      password: hashedPassword,
-      role: normalizedRole,
-    });
+    const user = isDatabaseReady()
+      ? await User.create({
+          name: normalizedName,
+          email: normalizedEmail,
+          password: hashedPassword,
+          role: normalizedRole,
+        })
+      : createUser({
+          name: normalizedName,
+          email: normalizedEmail,
+          password: hashedPassword,
+          role: normalizedRole,
+        });
 
     res.status(201).json({ 
       message: 'User registered successfully',
@@ -60,7 +72,9 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Please provide email and password' });
     }
 
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = isDatabaseReady()
+      ? await User.findOne({ email: normalizedEmail })
+      : findUserByEmail(normalizedEmail);
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -70,7 +84,7 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign(
+    const token = jwt.sign(//generation of JWT token 
       { id: user._id },
       JWT_SECRET,
       { expiresIn: '30d' }
@@ -100,7 +114,9 @@ exports.forgotPassword = async (req, res) => {
       return res.status(400).json({ message: 'Please provide email' });
     }
 
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = isDatabaseReady()
+      ? await User.findOne({ email: normalizedEmail })
+      : findUserByEmail(normalizedEmail);
     if (!user) {
       return res.json({ message: 'If that email exists, a reset link has been sent' });
     }
@@ -140,7 +156,9 @@ exports.resetPassword = async (req, res) => {
     // Verify token
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    const user = await User.findById(decoded.id);
+    const user = isDatabaseReady()
+      ? await User.findById(decoded.id)
+      : findUserById(decoded.id);
     if (!user) {
       return res.status(400).json({ message: 'Invalid token' });
     }
@@ -149,8 +167,12 @@ exports.resetPassword = async (req, res) => {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update password
-    user.password = hashedPassword;
-    await user.save();
+    if (isDatabaseReady()) {
+      user.password = hashedPassword;
+      await user.save();
+    } else {
+      updateUser(user._id, { password: hashedPassword });
+    }
 
     res.json({ message: 'Password reset successful' });
 
@@ -165,7 +187,18 @@ exports.resetPassword = async (req, res) => {
 // GET CURRENT USER (Protected route)
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = isDatabaseReady()
+      ? await User.findById(req.user.id).select('-password')
+      : (() => {
+          const localUser = findUserById(req.user.id);
+          if (!localUser) {
+            return null;
+          }
+
+          const { password, ...safeUser } = localUser;
+          return safeUser;
+        })();
+
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });

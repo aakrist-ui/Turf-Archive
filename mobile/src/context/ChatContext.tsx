@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { AppState } from 'react-native';
 import { useAuth } from './AuthContext';
 import api from '../services/api';
 
@@ -29,6 +30,7 @@ interface ChatContextType {
   loading: boolean;
   refreshChats: () => Promise<void>;
   markChatAsRead: (chatId: string) => Promise<void>;
+  isChatUnread: (chat: ChatRecord) => boolean;
 }
 
 const ChatContext = createContext<ChatContextType>({
@@ -37,22 +39,48 @@ const ChatContext = createContext<ChatContextType>({
   loading: false,
   refreshChats: async () => {},
   markChatAsRead: async () => {},
+  isChatUnread: () => false,
 });
 
-const STORAGE_KEY = 'chatLastSeenMap';
+const STORAGE_KEY_PREFIX = 'chatLastSeenMap';
+
+const normalizeId = (value: unknown) => {
+  if (!value) {
+    return '';
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'object' && '_id' in (value as Record<string, unknown>)) {
+    return String((value as Record<string, unknown>)._id);
+  }
+
+  return String(value);
+};
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { userToken, user } = useAuth();
+  const currentUserId = user?.id || (user as any)?._id || '';
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [lastSeenMap, setLastSeenMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const storageKey = currentUserId ? `${STORAGE_KEY_PREFIX}:${currentUserId}` : STORAGE_KEY_PREFIX;
 
   useEffect(() => {
     const loadSeenMap = async () => {
+      if (!currentUserId) {
+        setLastSeenMap({});
+        return;
+      }
+
       try {
-        const value = await AsyncStorage.getItem(STORAGE_KEY);
+        const value = await AsyncStorage.getItem(storageKey);
         if (value) {
           setLastSeenMap(JSON.parse(value));
+        } else {
+          setLastSeenMap({});
         }
       } catch (error) {
         console.log('Error loading chat seen map:', error);
@@ -60,11 +88,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     loadSeenMap();
-  }, []);
+  }, [currentUserId, storageKey]);
 
   const persistSeenMap = async (value: Record<string, string>) => {
     setLastSeenMap(value);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    if (currentUserId) {
+      await AsyncStorage.setItem(storageKey, JSON.stringify(value));
+    }
   };
 
   const refreshChats = useCallback(async () => {
@@ -88,6 +118,28 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshChats();
   }, [refreshChats]);
 
+  useEffect(() => {
+    if (!userToken) {
+      return;
+    }
+
+    const syncChats = () => {
+      refreshChats();
+    };
+
+    const intervalId = setInterval(syncChats, 4000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        syncChats();
+      }
+    });
+
+    return () => {
+      clearInterval(intervalId);
+      subscription.remove();
+    };
+  }, [refreshChats, userToken]);
+
   const markChatAsRead = useCallback(async (chatId: string) => {
     const targetChat = chats.find((chat) => chat._id === chatId);
     const seenAt = targetChat?.lastMessage?.sentAt || new Date().toISOString();
@@ -95,23 +147,25 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await persistSeenMap(nextValue);
   }, [chats, lastSeenMap]);
 
-  const unreadCount = useMemo(() => {
-    if (!user?.id) {
-      return 0;
+  const isChatUnread = useCallback((chat: ChatRecord) => {
+    if (!currentUserId) {
+      return false;
     }
 
-    return chats.filter((chat) => {
-      const sentAt = chat.lastMessage?.sentAt;
-      const senderId = chat.lastMessage?.sender?._id;
+    const sentAt = chat.lastMessage?.sentAt;
+    const senderId = normalizeId(chat.lastMessage?.sender?._id);
 
-      if (!sentAt || !senderId || senderId === user.id) {
-        return false;
-      }
+    if (!sentAt || !senderId || senderId === currentUserId) {
+      return false;
+    }
 
-      const seenAt = lastSeenMap[chat._id];
-      return !seenAt || new Date(sentAt).getTime() > new Date(seenAt).getTime();
-    }).length;
-  }, [chats, lastSeenMap, user?.id]);
+    const seenAt = lastSeenMap[chat._id];
+    return !seenAt || new Date(sentAt).getTime() > new Date(seenAt).getTime();
+  }, [currentUserId, lastSeenMap]);
+
+  const unreadCount = useMemo(() => {
+    return chats.filter(isChatUnread).length;
+  }, [chats, isChatUnread]);
 
   return (
     <ChatContext.Provider
@@ -121,6 +175,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         refreshChats,
         markChatAsRead,
+        isChatUnread,
       }}
     >
       {children}

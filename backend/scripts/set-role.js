@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/user');
 require('dotenv').config();
+const { findUserByEmail, updateUser } = require('../utils/localDevStore');
 
 const [, , email, role] = process.argv;
 const allowedRoles = ['user', 'owner', 'admin'];
@@ -16,24 +17,35 @@ async function run() {
     process.exit(1);
   }
 
-  await mongoose.connect(process.env.MONGO_URI);
+  const normalizedEmail = email.trim().toLowerCase();
+  let user;
 
-  const user = await User.findOneAndUpdate(
-    { email: email.trim().toLowerCase() },
-    { $set: { role } },
-    { returnDocument: 'after' },
-  ).select('name email role isActive');
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    user = await User.findOneAndUpdate(
+      { email: normalizedEmail },
+      { $set: { role } },
+      { returnDocument: 'after' },
+    ).select('name email role isActive');
+  } catch (error) {
+    const existingUser = findUserByEmail(normalizedEmail);
+    user = existingUser ? updateUser(existingUser._id, { role }) : null;
+  }
 
   if (!user) {
     console.log(`User not found: ${email}`);
-    await mongoose.disconnect();
+    try {
+      await mongoose.disconnect();
+    } catch (disconnectError) {}
     process.exit(1);
   }
 
   console.log('Updated user role:');
   console.log(JSON.stringify(user, null, 2));
 
-  await mongoose.disconnect();
+  try {
+    await mongoose.disconnect();
+  } catch (disconnectError) {}
 }
 
 run().catch(async (error) => {

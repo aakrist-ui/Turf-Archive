@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkLoginStatus = async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await AsyncStorage.getItem('userToken');//jwt tokens are stored in AsyncStorage for persistence across app restarts
       const userData = await AsyncStorage.getItem('userData');
 
       if (token && userData) {

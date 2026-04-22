@@ -4,7 +4,9 @@ const app = require('./app');
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB Connected'))
-  .catch(err => console.log(err));
+  .catch((err) => {
+    console.warn(`MongoDB unavailable, using local arena fallback: ${err.message}`);
+  });
 
 const PORT = process.env.PORT || 5000;
 

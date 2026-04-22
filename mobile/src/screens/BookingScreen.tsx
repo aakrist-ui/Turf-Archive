@@ -27,7 +27,7 @@ const isUpcomingBooking = (booking: BookingRecord) => {
 };
 
 const BookingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { bookings, refreshBookings, loading } = useNotifications();
+  const { bookings, refreshBookings, loading, upsertBooking, pushNotification } = useNotifications();
   const [activeFilter, setActiveFilter] = useState<'upcoming' | 'history'>('upcoming');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
@@ -39,8 +39,20 @@ const BookingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const cancelBooking = async (bookingId: string) => {
     try {
       setCancellingId(bookingId);
-      await api.put(`/bookings/${bookingId}/cancel`, {
+      const response = await api.put(`/bookings/${bookingId}/cancel`, {
         cancellationReason: 'Cancelled from mobile app',
+      });
+      const cancelledBooking = response.data.data;
+
+      upsertBooking(cancelledBooking);
+      pushNotification({
+        id: `${cancelledBooking._id}-cancelled`,
+        title: 'Booking cancelled',
+        message: `${cancelledBooking.arena?.name || 'Arena'} on ${cancelledBooking.startTime} is marked as cancelled.`,
+        type: 'update',
+        bookingId: cancelledBooking._id,
+        arenaId: cancelledBooking.arena?._id,
+        eventTime: new Date().toISOString(),
       });
       await refreshBookings();
     } catch (error: any) {
